@@ -18,10 +18,12 @@ That's it.
 
 PACKAGE GUI will start locally and open the dashboard in your browser.
 
-Also support:
+Also supported:
 
 ```bash
 pakage gui
+# or
+package-gui
 ```
 
 Expected terminal output:

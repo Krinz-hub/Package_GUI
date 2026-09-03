@@ -231,6 +231,7 @@ A local-first developer package & system management dashboard.
 USAGE:
   pakage [command] [options]
   pakage gui [options]
+  package-gui [command] [options]
 
 COMMANDS:
   gui            Launch the PACKAGE GUI server and open dashboard (default)

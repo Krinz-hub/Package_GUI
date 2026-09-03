@@ -30,6 +30,7 @@
     "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
     "start": "node bin/pakage.js",
     "gui": "node bin/pakage.js",
+    "package-gui": "node bin/pakage.js",
     "doctor": "node bin/pakage.js doctor",
     "status": "node bin/pakage.js status",
     "logs": "node bin/pakage.js logs",
