@@ -332,7 +332,7 @@ export function App() {
   };
 
   return (
-    <div className="flex h-screen bg-[#090d16] text-[#e2e8f0] overflow-hidden font-sans" style={{ isolation: 'isolate' }}>
+    <div className="flex h-screen bg-[#090d16] text-[#e2e8f0] overflow-hidden font-sans">
       {/* Sidebar */}
       <Sidebar
         currentTab={currentTab}
@@ -343,8 +343,8 @@ export function App() {
         overview={overview}
       />
 
-      {/* Main Content Area — explicit bg prevents white flash during tab re-renders */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#090d16]">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Header with backend connection indicator */}
         <Header
           searchQuery={searchQuery}
@@ -359,14 +359,7 @@ export function App() {
         />
 
         {/* Dynamic View Body */}
-        {/* scrollbar-gutter:stable reserves scrollbar space permanently,
-            preventing horizontal layout shift when content height changes.
-            bg-[#090d16] ensures no white gap is ever visible during React
-            conditional rendering (the primary white flash fix). */}
-        <main
-          className="flex-1 overflow-y-auto p-6 md:p-8 bg-[#090d16]"
-          style={{ scrollbarGutter: 'stable' }}
-        >
+        <main className="flex-1 overflow-y-auto p-6 md:p-8">
           {currentTab === 'overview' && (
             <OverviewDashboard
               overview={overview}
