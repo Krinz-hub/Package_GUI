@@ -26,11 +26,24 @@
   }
 }
 
+/* Prevent any white document flash — lock the entire root chain to the app dark bg */
+html {
+  background-color: #090d16;
+}
+
 body {
   margin: 0;
   background-color: #090d16;
   color: #e2e8f0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+/* React mount point — must also be dark so conditional rendering gaps don't flash */
+#root {
+  background-color: #090d16;
+  min-height: 100vh;
+  /* Reserve scrollbar gutter at document level to prevent horizontal layout shifts */
   overflow-x: hidden;
 }
 
