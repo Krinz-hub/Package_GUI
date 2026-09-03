@@ -1,12 +1,13 @@
 {
   "name": "package-gui",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PACKAGE GUI — Local-first Developer Package Management Dashboard for macOS, Windows & Linux",
   "type": "module",
   "main": "apps/server/dist/index.js",
   "bin": {
-    "pakage": "./bin/pakage.js",
-    "package-gui": "./bin/package.js"
+    "package": "./bin/package.js",
+    "package-gui": "./bin/package.js",
+    "pakage": "./bin/pakage.js"
   },
   "repository": {
     "type": "git",
