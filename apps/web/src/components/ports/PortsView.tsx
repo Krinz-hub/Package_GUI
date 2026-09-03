@@ -222,8 +222,12 @@ export const PortsView: React.FC<PortsViewProps> = ({
                           className="px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-400 hover:text-red-300 text-xs font-medium border border-red-500/30 transition-all flex items-center gap-1 disabled:opacity-50"
                           title="Stop process listening on this port"
                         >
-                          <Square className="w-3 h-3 fill-current" />
-                          <span>Stop</span>
+                          {stoppingPid === port.pid ? (
+                            <RotateCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Square className="w-3 h-3 fill-current" />
+                          )}
+                          <span>{stoppingPid === port.pid ? 'Stopping...' : 'Stop'}</span>
                         </button>
                       </div>
                     </td>

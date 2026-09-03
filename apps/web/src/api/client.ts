@@ -69,15 +69,23 @@ async function fetchJson<T>(url: string, options?: FetchOptions): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  const reqHeaders: Record<string, string> = {
+    Accept: 'application/json',
+    ...(options?.headers as Record<string, string>),
+  };
+
+  // Only declare Content-Type: application/json when an actual body is provided
+  if (options?.body !== undefined && options?.body !== null) {
+    if (!reqHeaders['Content-Type']) {
+      reqHeaders['Content-Type'] = 'application/json';
+    }
+  }
+
   let res: Response;
   try {
     res = await fetch(fullUrl, {
       signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...options?.headers,
-      },
+      headers: reqHeaders,
       ...options,
     });
   } catch (networkErr: any) {

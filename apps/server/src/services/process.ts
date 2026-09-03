@@ -1,6 +1,15 @@
 import { ProcessInfo } from '@stuff-manager/shared';
 import { safeExec } from '../utils/exec.js';
 import { providerRegistry } from '../providers/registry.js';
+import process from 'process';
+
+export interface ProcessStopResult {
+  success: boolean;
+  pid: number;
+  status: 'stopped' | 'running';
+  message: string;
+  code?: string;
+}
 
 export class ProcessService {
   public async getDevProcesses(): Promise<ProcessInfo[]> {
@@ -99,12 +108,152 @@ export class ProcessService {
     return processes.slice(0, 50);
   }
 
-  public async stopProcess(pid: number): Promise<{ success: boolean; message: string }> {
-    if (!pid || pid <= 1) return { success: false, message: 'Invalid PID' };
-    const res = await safeExec('kill', ['-15', String(pid)]);
+  /**
+   * Checks if a process is alive.
+   */
+  public isProcessAlive(pid: number): boolean {
+    if (typeof pid !== 'number' || isNaN(pid) || pid <= 0) return false;
+    try {
+      // Signal 0 tests for existence without sending an actual termination signal
+      process.kill(pid, 0);
+      return true;
+    } catch (err: any) {
+      // EPERM means process exists but we lack permission to signal it
+      if (err && err.code === 'EPERM') return true;
+      return false;
+    }
+  }
+
+  /**
+   * Stops a process by PID using cross-platform graceful-first termination with verification.
+   */
+  public async stopProcess(pid: number): Promise<ProcessStopResult> {
+    // 1. Validation
+    if (typeof pid !== 'number' || isNaN(pid) || !Number.isInteger(pid) || pid <= 0) {
+      return {
+        success: false,
+        pid,
+        status: 'running',
+        code: 'INVALID_PID',
+        message: `Invalid PID: ${pid}. PID must be a positive integer.`,
+      };
+    }
+
+    // 2. Safeguard against terminating system-critical processes
+    if (pid === 1) {
+      return {
+        success: false,
+        pid,
+        status: 'running',
+        code: 'CRITICAL_SYSTEM_PROCESS',
+        message: 'Cannot terminate system initialization process (PID 1).',
+      };
+    }
+
+    // 3. Safeguard against PACKAGE GUI terminating itself
+    if (pid === process.pid || pid === process.ppid) {
+      return {
+        success: false,
+        pid,
+        status: 'running',
+        code: 'SELF_TERMINATION_PROTECTED',
+        message: 'Cannot terminate the active PACKAGE GUI server process.',
+      };
+    }
+
+    // 4. Pre-check: Verify process is running
+    if (!this.isProcessAlive(pid)) {
+      return {
+        success: true,
+        pid,
+        status: 'stopped',
+        message: `Process ${pid} is already stopped or does not exist.`,
+      };
+    }
+
+    const isWindows = process.platform === 'win32';
+
+    // 5. Stage 1: Graceful Termination (SIGTERM on Unix / taskkill on Windows)
+    try {
+      if (isWindows) {
+        await safeExec('taskkill', ['/PID', String(pid)]);
+      } else {
+        process.kill(pid, 'SIGTERM');
+      }
+    } catch (err: any) {
+      if (err?.code === 'EPERM') {
+        return {
+          success: false,
+          pid,
+          status: 'running',
+          code: 'PROCESS_PERMISSION_DENIED',
+          message: `Permission denied while attempting to stop process (PID ${pid}). Administrator/root privileges required.`,
+        };
+      }
+    }
+
+    // 6. Polling verification for graceful exit (wait up to 600ms)
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      if (!this.isProcessAlive(pid)) {
+        return {
+          success: true,
+          pid,
+          status: 'stopped',
+          message: `Process (PID ${pid}) stopped gracefully.`,
+        };
+      }
+    }
+
+    // 7. Stage 2: Force Termination Fallback (SIGKILL on Unix / taskkill /F on Windows)
+    try {
+      if (isWindows) {
+        await safeExec('taskkill', ['/F', '/PID', String(pid)]);
+      } else {
+        process.kill(pid, 'SIGKILL');
+      }
+    } catch (err: any) {
+      if (err?.code === 'EPERM') {
+        return {
+          success: false,
+          pid,
+          status: 'running',
+          code: 'PROCESS_PERMISSION_DENIED',
+          message: `Permission denied while attempting to force terminate process (PID ${pid}).`,
+        };
+      }
+    }
+
+    // 8. Polling verification for force exit (wait up to 400ms)
+    for (let i = 0; i < 4; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      if (!this.isProcessAlive(pid)) {
+        return {
+          success: true,
+          pid,
+          status: 'stopped',
+          message: `Process (PID ${pid}) stopped successfully.`,
+        };
+      }
+    }
+
+    // 9. Final state evaluation
+    const stillAlive = this.isProcessAlive(pid);
+    if (!stillAlive) {
+      return {
+        success: true,
+        pid,
+        status: 'stopped',
+        message: `Process (PID ${pid}) stopped.`,
+      };
+    }
+
     return {
-      success: res.exitCode === 0,
-      message: res.exitCode === 0 ? `Process ${pid} stopped successfully` : `Failed to stop process ${pid}`,
+      success: false,
+      pid,
+      status: 'running',
+      code: 'PROCESS_DID_NOT_EXIT',
+      message: `Process (PID ${pid}) did not exit within timeout. It may be hung or require elevated privileges.`,
     };
   }
 }
