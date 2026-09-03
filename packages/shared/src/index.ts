@@ -75,9 +75,21 @@ export interface PackageManagerInfo {
   description: string;
 }
 
+export interface PythonEnvironmentInfo {
+  name: string; // e.g. '.venv', 'Homebrew Python', 'System Python'
+  type: 'venv' | 'homebrew' | 'system' | 'conda' | 'other';
+  path: string;
+  pythonPath: string;
+  pipPath?: string;
+  version?: string;
+  isExternallyManaged: boolean;
+  externallyManagedReason?: string;
+  active: boolean;
+}
+
 export type DoctorStatus = 'healthy' | 'warning' | 'error' | 'not_installed';
 
-export type DoctorActionType = 'launch-app' | 'command' | 'install-package';
+export type DoctorActionType = 'launch-app' | 'command' | 'install-package' | 'create-venv';
 
 export interface DoctorAction {
   id: string;

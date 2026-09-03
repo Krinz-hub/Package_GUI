@@ -1,12 +1,22 @@
 import { DoctorAction, OperationLog } from '@stuff-manager/shared';
 import { platform } from '../platform/platform.js';
 import { runnerService } from './runner.js';
+import { pipProvider } from '../providers/pip.js';
 import { safeExec } from '../utils/exec.js';
 
 export class ActionRunner {
   public async executeAction(action: DoctorAction): Promise<{ success: boolean; message: string; job?: OperationLog }> {
     if (!action || !action.type) {
       throw new Error('Invalid action payload');
+    }
+
+    // 0. Create Python Virtual Environment (.venv)
+    if (action.type === 'create-venv') {
+      const result = await pipProvider.createVirtualEnvironment();
+      return {
+        success: result.success,
+        message: result.message,
+      };
     }
 
     // 1. Launch native Application

@@ -11,6 +11,13 @@ export interface CommandPlan {
   requiresPrivilege?: boolean;
 }
 
+export interface CommandPlanOptions {
+  isCask?: boolean;
+  global?: boolean;
+  allowBreakSystemPackages?: boolean;
+  venvPath?: string;
+}
+
 export interface PackageManagerProvider {
   readonly id: PackageManagerType;
   readonly name: string;
@@ -22,8 +29,8 @@ export interface PackageManagerProvider {
   info(nameOrId: string): Promise<Package | null>;
   search?(query: string): Promise<Package[]>;
 
-  planInstall(name: string, options?: { isCask?: boolean; global?: boolean }): Promise<CommandPlan>;
-  planUninstall(name: string, options?: { isCask?: boolean; global?: boolean }): Promise<CommandPlan>;
-  planUpdate(name: string, options?: { isCask?: boolean; global?: boolean }): Promise<CommandPlan>;
-  planReinstall?(name: string, options?: { isCask?: boolean; global?: boolean }): Promise<CommandPlan>;
+  planInstall(name: string, options?: CommandPlanOptions): Promise<CommandPlan>;
+  planUninstall(name: string, options?: CommandPlanOptions): Promise<CommandPlan>;
+  planUpdate(name: string, options?: CommandPlanOptions): Promise<CommandPlan>;
+  planReinstall?(name: string, options?: CommandPlanOptions): Promise<CommandPlan>;
 }

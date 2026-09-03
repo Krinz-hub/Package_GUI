@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { providerRegistry } from '../providers/registry.js';
 import { runnerService } from '../services/runner.js';
+import { pipProvider } from '../providers/pip.js';
 import { PackageManagerType } from '@stuff-manager/shared';
 
 const ActionSchema = z.object({
@@ -23,6 +24,12 @@ const ActionSchema = z.object({
   isCask: z.boolean().optional(),
   global: z.boolean().optional(),
   forceTerminalPrivilege: z.boolean().optional(),
+  allowBreakSystemPackages: z.boolean().optional(),
+});
+
+const CreateVenvSchema = z.object({
+  targetDir: z.string().optional(),
+  envName: z.string().optional(),
 });
 
 export const packageRoutes: FastifyPluginAsync = async (fastify) => {
@@ -57,6 +64,33 @@ export const packageRoutes: FastifyPluginAsync = async (fastify) => {
     return { ok: true, results };
   });
 
+  // GET /api/python/environments
+  fastify.get('/python/environments', async () => {
+    const environments = await pipProvider.getEnvironments();
+    const active = await pipProvider.getActiveEnvironment();
+    return { ok: true, environments, active };
+  });
+
+  // POST /api/python/create-venv
+  fastify.post('/python/create-venv', async (req, reply) => {
+    const parse = CreateVenvSchema.safeParse(req.body || {});
+    const targetDir = parse.success ? parse.data.targetDir : undefined;
+    const envName = parse.success ? parse.data.envName : undefined;
+
+    try {
+      const result = await pipProvider.createVirtualEnvironment(targetDir, envName);
+      return { ok: true, ...result };
+    } catch (err: any) {
+      return reply.code(500).send({
+        ok: false,
+        error: {
+          code: 'VENV_CREATION_FAILED',
+          message: err.message || 'Failed to create virtual environment',
+        },
+      });
+    }
+  });
+
   // POST /api/packages/install
   fastify.post('/packages/install', async (req, reply) => {
     const parse = ActionSchema.safeParse(req.body);
@@ -70,7 +104,7 @@ export const packageRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
     }
-    const { manager, name, isCask, global, forceTerminalPrivilege } = parse.data;
+    const { manager, name, isCask, global, forceTerminalPrivilege, allowBreakSystemPackages } = parse.data;
     try {
       const job = await runnerService.execute({
         manager,
@@ -79,9 +113,22 @@ export const packageRoutes: FastifyPluginAsync = async (fastify) => {
         isCask,
         global,
         forceTerminalPrivilege,
+        allowBreakSystemPackages,
       });
       return { ok: true, success: true, job };
     } catch (err: any) {
+      if (err.code === 'PYTHON_EXTERNALLY_MANAGED') {
+        return reply.code(422).send({
+          ok: false,
+          error: {
+            code: 'PYTHON_EXTERNALLY_MANAGED',
+            message: err.message,
+            interpreter: err.interpreter,
+            environment: err.environment,
+            recommendation: 'Use a virtual environment (.venv) or pipx.',
+          },
+        });
+      }
       return reply.code(500).send({
         ok: false,
         error: {
@@ -105,7 +152,7 @@ export const packageRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
     }
-    const { manager, name, isCask, global, forceTerminalPrivilege } = parse.data;
+    const { manager, name, isCask, global, forceTerminalPrivilege, allowBreakSystemPackages } = parse.data;
     try {
       const job = await runnerService.execute({
         manager,
@@ -114,6 +161,7 @@ export const packageRoutes: FastifyPluginAsync = async (fastify) => {
         isCask,
         global,
         forceTerminalPrivilege,
+        allowBreakSystemPackages,
       });
       return { ok: true, success: true, job };
     } catch (err: any) {
@@ -140,7 +188,7 @@ export const packageRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
     }
-    const { manager, name, isCask, global, forceTerminalPrivilege } = parse.data;
+    const { manager, name, isCask, global, forceTerminalPrivilege, allowBreakSystemPackages } = parse.data;
     try {
       const job = await runnerService.execute({
         manager,
@@ -149,9 +197,21 @@ export const packageRoutes: FastifyPluginAsync = async (fastify) => {
         isCask,
         global,
         forceTerminalPrivilege,
+        allowBreakSystemPackages,
       });
       return { ok: true, success: true, job };
     } catch (err: any) {
+      if (err.code === 'PYTHON_EXTERNALLY_MANAGED') {
+        return reply.code(422).send({
+          ok: false,
+          error: {
+            code: 'PYTHON_EXTERNALLY_MANAGED',
+            message: err.message,
+            interpreter: err.interpreter,
+            recommendation: 'Use a virtual environment (.venv) or pipx.',
+          },
+        });
+      }
       return reply.code(500).send({
         ok: false,
         error: {
@@ -175,7 +235,7 @@ export const packageRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
     }
-    const { manager, name, isCask, global, forceTerminalPrivilege } = parse.data;
+    const { manager, name, isCask, global, forceTerminalPrivilege, allowBreakSystemPackages } = parse.data;
     try {
       const job = await runnerService.execute({
         manager,
@@ -184,9 +244,21 @@ export const packageRoutes: FastifyPluginAsync = async (fastify) => {
         isCask,
         global,
         forceTerminalPrivilege,
+        allowBreakSystemPackages,
       });
       return { ok: true, success: true, job };
     } catch (err: any) {
+      if (err.code === 'PYTHON_EXTERNALLY_MANAGED') {
+        return reply.code(422).send({
+          ok: false,
+          error: {
+            code: 'PYTHON_EXTERNALLY_MANAGED',
+            message: err.message,
+            interpreter: err.interpreter,
+            recommendation: 'Use a virtual environment (.venv) or pipx.',
+          },
+        });
+      }
       return reply.code(500).send({
         ok: false,
         error: {

@@ -149,33 +149,75 @@ export class DoctorService {
       });
     }
 
-    // 6. Python 3 check
-    const pyRes = await safeExec('python3', ['--version']);
-    if (pyRes.exitCode === 0) {
-      const match = pyRes.stdout.match(/Python\s+([\d\.]+)/i);
-      checks.push({
-        id: 'runtime:python3',
-        name: 'Python 3',
-        category: 'runtime',
-        status: 'healthy',
-        version: match ? match[1] : pyRes.stdout.trim(),
-        message: 'Python 3 is available',
-      });
-    } else {
+    // 6. Python 3 & Environment Check (PEP 668 aware)
+    try {
+      const { pipProvider } = await import('../providers/pip.js');
+      const envs = await pipProvider.getEnvironments();
+      const activeEnv = await pipProvider.getActiveEnvironment();
+
+      if (envs.length > 0) {
+        if (activeEnv.type === 'venv') {
+          checks.push({
+            id: 'runtime:python3',
+            name: 'Python Environment',
+            category: 'runtime',
+            status: 'healthy',
+            version: activeEnv.version ? `Python ${activeEnv.version}` : undefined,
+            path: activeEnv.path,
+            message: `Virtual environment active (${activeEnv.name}). System-wide restrictions isolated.`,
+            details: `Interpreter: ${activeEnv.pythonPath}`,
+          });
+        } else if (activeEnv.isExternallyManaged) {
+          checks.push({
+            id: 'runtime:python3',
+            name: 'Python Environment',
+            category: 'runtime',
+            status: 'warning',
+            version: activeEnv.version ? `Python ${activeEnv.version}` : undefined,
+            path: activeEnv.pythonPath,
+            message: `${activeEnv.name} is externally managed (PEP 668). System-wide pip installations are restricted to protect stability.`,
+            suggestion: 'python3 -m venv .venv',
+            action: {
+              id: 'create-venv',
+              label: 'Create Virtual Environment (.venv)',
+              type: 'create-venv',
+            },
+          });
+        } else {
+          checks.push({
+            id: 'runtime:python3',
+            name: 'Python 3',
+            category: 'runtime',
+            status: 'healthy',
+            version: activeEnv.version ? `Python ${activeEnv.version}` : undefined,
+            path: activeEnv.pythonPath,
+            message: `Python 3 interpreter is active at ${activeEnv.pythonPath}`,
+          });
+        }
+      } else {
+        checks.push({
+          id: 'runtime:python3',
+          name: 'Python 3',
+          category: 'runtime',
+          status: 'warning',
+          message: 'Python 3 not found in PATH',
+          suggestion: 'brew install python',
+          action: {
+            id: 'install-python',
+            label: 'Install Python',
+            type: 'install-package',
+            manager: 'brew',
+            packageName: 'python',
+          },
+        });
+      }
+    } catch (_) {
       checks.push({
         id: 'runtime:python3',
         name: 'Python 3',
         category: 'runtime',
         status: 'warning',
-        message: 'Python 3 not found in PATH',
-        suggestion: 'brew install python',
-        action: {
-          id: 'install-python',
-          label: 'Install Python',
-          type: 'install-package',
-          manager: 'brew',
-          packageName: 'python',
-        },
+        message: 'Unable to query Python runtime',
       });
     }
 

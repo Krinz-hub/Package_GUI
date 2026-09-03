@@ -18,6 +18,7 @@ export type ErrorCategory =
   | 'API_ERROR'
   | 'PERMISSION_ERROR'
   | 'PACKAGE_MANAGER_ERROR'
+  | 'PYTHON_EXTERNALLY_MANAGED'
   | 'VALIDATION_ERROR'
   | 'TIMEOUT'
   | 'PROCESS_ERROR'
@@ -110,7 +111,9 @@ async function fetchJson<T>(url: string, options?: FetchOptions): Promise<T> {
           message = errorData.error.message || message;
           if (errorData.error.code) {
             const rawCode = String(errorData.error.code);
-            if (rawCode.includes('PERMISSION') || rawCode.includes('SUDO')) {
+            if (rawCode === 'PYTHON_EXTERNALLY_MANAGED' || rawCode.includes('EXTERNALLY_MANAGED')) {
+              code = 'PYTHON_EXTERNALLY_MANAGED';
+            } else if (rawCode.includes('PERMISSION') || rawCode.includes('SUDO')) {
               code = 'PERMISSION_ERROR';
             } else if (rawCode.includes('PACKAGE') || rawCode.includes('INSTALL') || rawCode.includes('UNINSTALL')) {
               code = 'PACKAGE_MANAGER_ERROR';
@@ -136,7 +139,9 @@ async function fetchJson<T>(url: string, options?: FetchOptions): Promise<T> {
     }
 
     // Status code fallbacks
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 422 && code === 'API_ERROR') {
+      code = 'PYTHON_EXTERNALLY_MANAGED';
+    } else if (res.status === 401 || res.status === 403) {
       code = 'PERMISSION_ERROR';
     } else if (res.status === 400) {
       code = code === 'API_ERROR' ? 'VALIDATION_ERROR' : code;
@@ -195,12 +200,25 @@ export const api = {
       `/packages/search?q=${encodeURIComponent(query)}${manager ? `&manager=${manager}` : ''}`
     ),
 
+  getPythonEnvironments: () =>
+    fetchJson<{ ok: boolean; environments: any[]; active: any }>('/python/environments'),
+
+  createVirtualEnvironment: (payload?: { targetDir?: string; envName?: string }) =>
+    fetchJson<{ ok: boolean; success: boolean; message: string; envPath: string; pythonPath: string }>(
+      '/python/create-venv',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+      }
+    ),
+
   installPackage: (payload: {
     manager: PackageManagerType;
     name: string;
     isCask?: boolean;
     global?: boolean;
     forceTerminalPrivilege?: boolean;
+    allowBreakSystemPackages?: boolean;
   }) =>
     fetchJson<{ ok: boolean; success: boolean; job: OperationLog }>('/packages/install', {
       method: 'POST',
@@ -212,6 +230,7 @@ export const api = {
     name: string;
     isCask?: boolean;
     forceTerminalPrivilege?: boolean;
+    allowBreakSystemPackages?: boolean;
   }) =>
     fetchJson<{ ok: boolean; success: boolean; job: OperationLog }>('/packages/uninstall', {
       method: 'POST',
@@ -223,6 +242,7 @@ export const api = {
     name: string;
     isCask?: boolean;
     forceTerminalPrivilege?: boolean;
+    allowBreakSystemPackages?: boolean;
   }) =>
     fetchJson<{ ok: boolean; success: boolean; job: OperationLog }>('/packages/update', {
       method: 'POST',
@@ -234,6 +254,7 @@ export const api = {
     name: string;
     isCask?: boolean;
     forceTerminalPrivilege?: boolean;
+    allowBreakSystemPackages?: boolean;
   }) =>
     fetchJson<{ ok: boolean; success: boolean; job: OperationLog }>('/packages/reinstall', {
       method: 'POST',

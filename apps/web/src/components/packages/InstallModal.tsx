@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Search,
@@ -7,6 +7,9 @@ import {
   Shield,
   Boxes,
   RotateCw,
+  FolderPlus,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { PackageManagerType, Package } from '@stuff-manager/shared';
 import { api } from '../../api/client';
@@ -26,9 +29,42 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
   const [isSearching, setIsSearching] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
+
+  // Python environment state
+  const [pythonEnv, setPythonEnv] = useState<any>(null);
+  const [isCreatingVenv, setIsCreatingVenv] = useState(false);
+  const [venvSuccessMsg, setVenvSuccessMsg] = useState<string | null>(null);
+
   const { startJob } = useTerminal();
 
+  useEffect(() => {
+    if (isOpen && manager === 'pip') {
+      api.getPythonEnvironments()
+        .then((res) => {
+          if (res.active) setPythonEnv(res.active);
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, manager]);
+
   if (!isOpen) return null;
+
+  const handleCreateVenv = async () => {
+    setIsCreatingVenv(true);
+    setInstallError(null);
+    try {
+      const res = await api.createVirtualEnvironment();
+      if (res.ok) {
+        setVenvSuccessMsg(`Created virtual environment at ${res.envPath}`);
+        const envsRes = await api.getPythonEnvironments();
+        if (envsRes.active) setPythonEnv(envsRes.active);
+      }
+    } catch (err: any) {
+      setInstallError(err.message || 'Failed to create virtual environment');
+    } finally {
+      setIsCreatingVenv(false);
+    }
+  };
 
   const handleSearch = async () => {
     if (!packageName.trim()) return;
@@ -143,6 +179,49 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
+          {/* Python Environment Diagnostics Banner */}
+          {manager === 'pip' && (
+            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-medium">Active Python Environment:</span>
+                {pythonEnv?.type === 'venv' ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-400 font-mono font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {pythonEnv.name} (Isolated)
+                  </span>
+                ) : pythonEnv?.isExternallyManaged ? (
+                  <span className="inline-flex items-center gap-1 text-amber-300 font-mono font-semibold">
+                    <AlertTriangle className="w-3.5 h-3.5" /> {pythonEnv.name} (PEP 668)
+                  </span>
+                ) : (
+                  <span className="text-slate-300 font-mono">{pythonEnv?.name || 'System Python'}</span>
+                )}
+              </div>
+
+              {pythonEnv?.isExternallyManaged && pythonEnv?.type !== 'venv' && (
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-slate-400 leading-tight">
+                    System-wide installs restricted. Use a project virtual environment.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCreateVenv}
+                    disabled={isCreatingVenv}
+                    className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-medium border border-blue-500/30 text-[11px] flex items-center gap-1 transition-all flex-shrink-0 disabled:opacity-50"
+                  >
+                    <FolderPlus className="w-3 h-3" />
+                    <span>{isCreatingVenv ? 'Creating...' : 'Create .venv'}</span>
+                  </button>
+                </div>
+              )}
+
+              {venvSuccessMsg && (
+                <div className="p-2 rounded bg-emerald-500/15 border border-emerald-500/30 text-[11px] text-emerald-300 font-mono">
+                  ✓ {venvSuccessMsg}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Package Name Input */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -153,7 +232,7 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="e.g. n8n, ffmpeg, ollama, postgres..."
+                  placeholder="e.g. wheel, requests, numpy, n8n, ffmpeg..."
                   value={packageName}
                   onChange={(e) => setPackageName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}

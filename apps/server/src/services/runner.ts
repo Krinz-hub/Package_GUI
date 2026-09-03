@@ -18,6 +18,7 @@ export interface RunOperationOptions {
   isCask?: boolean;
   global?: boolean;
   forceTerminalPrivilege?: boolean;
+  allowBreakSystemPackages?: boolean;
 }
 
 export class RunnerService {
@@ -40,7 +41,7 @@ export class RunnerService {
   }
 
   public async execute(opts: RunOperationOptions): Promise<OperationLog> {
-    const { manager, action, packageName, isCask, forceTerminalPrivilege } = opts;
+    const { manager, action, packageName, isCask, forceTerminalPrivilege, allowBreakSystemPackages } = opts;
 
     if (!validatePackageName(packageName)) {
       throw new Error(`Invalid package name: "${packageName}"`);
@@ -53,12 +54,13 @@ export class RunnerService {
 
     // Get command plan
     let plan;
-    if (action === 'install') plan = await provider.planInstall(packageName, { isCask });
-    else if (action === 'uninstall') plan = await provider.planUninstall(packageName, { isCask });
-    else if (action === 'update') plan = await provider.planUpdate(packageName, { isCask });
+    const planOpts = { isCask, allowBreakSystemPackages };
+    if (action === 'install') plan = await provider.planInstall(packageName, planOpts);
+    else if (action === 'uninstall') plan = await provider.planUninstall(packageName, planOpts);
+    else if (action === 'update') plan = await provider.planUpdate(packageName, planOpts);
     else if (action === 'reinstall') {
       if (!provider.planReinstall) throw new Error(`Reinstall not supported for ${manager}`);
-      plan = await provider.planReinstall(packageName, { isCask });
+      plan = await provider.planReinstall(packageName, planOpts);
     } else {
       throw new Error(`Unknown action: ${action}`);
     }
