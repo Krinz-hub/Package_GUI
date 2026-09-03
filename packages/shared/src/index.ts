@@ -1,4 +1,16 @@
-export type PackageManagerType = 'brew' | 'npm' | 'pip' | 'cargo' | 'docker' | 'android';
+export type PackageManagerType =
+  | 'brew'
+  | 'npm'
+  | 'pip'
+  | 'cargo'
+  | 'docker'
+  | 'android'
+  | 'winget'
+  | 'chocolatey'
+  | 'scoop'
+  | 'apt'
+  | 'dnf'
+  | 'pacman';
 
 export type PackageKind =
   | 'formula'
@@ -7,10 +19,12 @@ export type PackageKind =
   | 'pip-pkg'
   | 'cargo-bin'
   | 'container'
-  | 'sdk-pkg';
+  | 'sdk-pkg'
+  | 'system-pkg'
+  | 'app-pkg';
 
 export interface Package {
-  id: string; // e.g. 'brew:node', 'npm:n8n', 'brew:cask:docker'
+  id: string; // e.g. 'brew:node', 'npm:n8n', 'winget:Microsoft.PowerToys'
   name: string;
   displayName: string;
   version: string;
@@ -31,6 +45,22 @@ export interface Package {
   pinned?: boolean;
   bottle?: boolean;
   tap?: string;
+  activeProcesses?: { pid: number; name: string; port?: number }[];
+}
+
+export type PlatformType = 'darwin' | 'win32' | 'linux';
+
+export interface OperatingSystemInfo {
+  platform: PlatformType;
+  displayName: string; // e.g. 'macOS 15.2 (Apple Silicon)', 'Windows 11 (x64)', 'Ubuntu 24.04 (x64)'
+  distro?: string; // e.g. 'Ubuntu', 'Fedora', 'Arch Linux', 'macOS'
+  release: string;
+  arch: string;
+  kernel: string;
+  hostname: string;
+  uptime: number;
+  shell: string; // e.g. 'zsh', 'bash', 'PowerShell'
+  shellPath: string;
 }
 
 export interface PackageManagerInfo {
@@ -47,6 +77,20 @@ export interface PackageManagerInfo {
 
 export type DoctorStatus = 'healthy' | 'warning' | 'error' | 'not_installed';
 
+export type DoctorActionType = 'launch-app' | 'command' | 'install-package';
+
+export interface DoctorAction {
+  id: string;
+  label: string;
+  type: DoctorActionType;
+  application?: string;
+  command?: string;
+  manager?: PackageManagerType;
+  packageName?: string;
+  isPrivileged?: boolean;
+  requiresTerminal?: boolean;
+}
+
 export interface DoctorCheck {
   id: string;
   name: string;
@@ -57,17 +101,47 @@ export interface DoctorCheck {
   message: string;
   details?: string;
   suggestion?: string;
-  actionCommand?: string;
+  action?: DoctorAction;
+}
+
+export interface PortInfo {
+  port: number;
+  protocol: 'TCP' | 'UDP';
+  address: string;
+  status: string; // 'LISTENING', 'ESTABLISHED', etc.
+  pid: number;
+  processName: string;
+  command: string;
+  packageName?: string;
+  packageManager?: PackageManagerType;
+  packageId?: string;
+  user?: string;
 }
 
 export interface ProcessInfo {
   pid: number;
   name: string;
   command: string;
-  port?: number;
+  ports: number[];
   cpu?: string;
   memory?: string;
   user: string;
+  status: 'running' | 'sleeping' | 'stopped';
+  executablePath?: string;
+  packageName?: string;
+  packageManager?: PackageManagerType;
+}
+
+export interface ServiceInfo {
+  id: string;
+  name: string;
+  displayName: string;
+  status: 'running' | 'stopped' | 'not_installed' | 'unknown';
+  port?: number;
+  pid?: number;
+  manager?: string;
+  description?: string;
+  startup?: string;
 }
 
 export interface DockerContainer {
@@ -141,16 +215,19 @@ export interface CommandStreamEvent {
   timestamp: string;
 }
 
+export interface TerminalWSMessage {
+  type: 'input' | 'resize' | 'output' | 'status';
+  data?: string;
+  cols?: number;
+  rows?: number;
+  status?: 'connected' | 'closed';
+}
+
 export interface SystemOverview {
-  os: {
-    platform: string;
-    release: string;
-    arch: string;
-    hostname: string;
-    uptime: number;
-  };
+  os: OperatingSystemInfo;
   totalPackages: number;
   totalUpdates: number;
+  totalPorts?: number;
   managers: PackageManagerInfo[];
   doctorIssuesCount: number;
   runningProcessesCount: number;

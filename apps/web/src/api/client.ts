@@ -3,7 +3,10 @@ import {
   PackageManagerType,
   SystemOverview,
   DoctorCheck,
+  DoctorAction,
   ProcessInfo,
+  PortInfo,
+  ServiceInfo,
   DockerInfo,
   AndroidInfo,
   OperationLog,
@@ -36,7 +39,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   getOverview: () => fetchJson<SystemOverview>('/overview'),
-  
+
   getPackages: (manager?: PackageManagerType) =>
     fetchJson<{ packages: Package[]; total: number }>(
       manager ? `/packages?manager=${manager}` : '/packages'
@@ -100,7 +103,17 @@ export const api = {
       summary: { total: number; healthy: number; warning: number; error: number };
     }>('/doctor'),
 
+  runDoctorAction: (action: DoctorAction) =>
+    fetchJson<{ success: boolean; message: string; job?: OperationLog }>('/doctor/run-action', {
+      method: 'POST',
+      body: JSON.stringify(action),
+    }),
+
+  getPorts: () => fetchJson<{ ports: PortInfo[]; total: number }>('/ports'),
+
   getProcesses: () => fetchJson<{ processes: ProcessInfo[]; total: number }>('/processes'),
+
+  getServices: () => fetchJson<{ services: ServiceInfo[]; total: number }>('/services'),
 
   stopProcess: (pid: number) =>
     fetchJson<{ success: boolean; message: string }>('/processes/stop', {

@@ -1,46 +1,67 @@
 import { DoctorCheck } from '@stuff-manager/shared';
 import { safeExec } from '../utils/exec.js';
+import { platform } from '../platform/platform.js';
 import os from 'os';
 import fs from 'fs';
 
 export class DoctorService {
   public async runDiagnostics(): Promise<DoctorCheck[]> {
     const checks: DoctorCheck[] = [];
+    const osInfo = await platform.getOSInfo();
 
-    // 1. macOS System check
+    // 1. Operating System check
     checks.push({
-      id: 'system:macos',
-      name: 'macOS Platform',
+      id: 'system:os',
+      name: 'Operating System',
       category: 'system',
       status: 'healthy',
-      version: `${os.type()} ${os.release()} (${os.arch()})`,
-      message: `Running macOS on Apple Silicon / Darwin (${os.hostname()})`,
+      version: osInfo.displayName,
+      message: `Running ${osInfo.displayName} on ${osInfo.hostname} (Shell: ${osInfo.shell})`,
     });
 
-    // 2. Homebrew check
-    const brewRes = await safeExec('brew', ['--version']);
-    if (brewRes.exitCode === 0) {
-      const match = brewRes.stdout.match(/Homebrew\s+([\d\.]+)/i);
-      const prefixRes = await safeExec('brew', ['--prefix']);
-      const prefix = prefixRes.exitCode === 0 ? prefixRes.stdout.trim() : '/opt/homebrew';
+    // 2. Package Manager Check (Platform-specific)
+    if (os.platform() === 'darwin') {
+      const brewRes = await safeExec('brew', ['--version']);
+      if (brewRes.exitCode === 0) {
+        const match = brewRes.stdout.match(/Homebrew\s+([\d\.]+)/i);
+        const prefixRes = await safeExec('brew', ['--prefix']);
+        const prefix = prefixRes.exitCode === 0 ? prefixRes.stdout.trim() : '/opt/homebrew';
 
+        checks.push({
+          id: 'pkg:homebrew',
+          name: 'Homebrew',
+          category: 'package_manager',
+          status: 'healthy',
+          version: match ? match[1] : 'installed',
+          path: prefix,
+          message: `Homebrew is installed and operational at ${prefix}`,
+        });
+      } else {
+        checks.push({
+          id: 'pkg:homebrew',
+          name: 'Homebrew',
+          category: 'package_manager',
+          status: 'not_installed',
+          message: 'Homebrew is not detected in PATH',
+          suggestion: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+          action: {
+            id: 'install-homebrew',
+            label: 'Install Homebrew',
+            type: 'command',
+            command: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+            requiresTerminal: true,
+          },
+        });
+      }
+    } else if (os.platform() === 'win32') {
+      const wingetRes = await safeExec('winget', ['--version']);
       checks.push({
-        id: 'pkg:homebrew',
-        name: 'Homebrew',
+        id: 'pkg:winget',
+        name: 'Windows Package Manager (winget)',
         category: 'package_manager',
-        status: 'healthy',
-        version: match ? match[1] : 'installed',
-        path: prefix,
-        message: `Homebrew is installed and operational at ${prefix}`,
-      });
-    } else {
-      checks.push({
-        id: 'pkg:homebrew',
-        name: 'Homebrew',
-        category: 'package_manager',
-        status: 'not_installed',
-        message: 'Homebrew is not detected in PATH',
-        suggestion: 'Install Homebrew using /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+        status: wingetRes.exitCode === 0 ? 'healthy' : 'not_installed',
+        version: wingetRes.exitCode === 0 ? wingetRes.stdout.trim() : undefined,
+        message: wingetRes.exitCode === 0 ? 'winget is active' : 'winget not found',
       });
     }
 
@@ -55,7 +76,7 @@ export class DoctorService {
         category: 'vcs',
         status: 'healthy',
         version: match ? match[1] : gitRes.stdout.trim(),
-        path: whichRes.stdout.trim(),
+        path: whichRes.stdout.trim() || undefined,
         message: 'Git is configured and available for version control',
       });
     } else {
@@ -65,7 +86,14 @@ export class DoctorService {
         category: 'vcs',
         status: 'error',
         message: 'Git executable not found in PATH',
-        suggestion: 'Install Xcode Command Line Tools: xcode-select --install or brew install git',
+        suggestion: 'brew install git',
+        action: {
+          id: 'install-git',
+          label: 'Install Git',
+          type: 'install-package',
+          manager: 'brew',
+          packageName: 'git',
+        },
       });
     }
 
@@ -79,7 +107,7 @@ export class DoctorService {
         category: 'runtime',
         status: 'healthy',
         version: nodeRes.stdout.trim(),
-        path: whichRes.stdout.trim(),
+        path: whichRes.stdout.trim() || undefined,
         message: `Node.js runtime active (${nodeRes.stdout.trim()})`,
       });
     } else {
@@ -88,23 +116,28 @@ export class DoctorService {
         name: 'Node.js Runtime',
         category: 'runtime',
         status: 'error',
-        message: 'Node.js runtime not found',
-        suggestion: 'Install Node.js via Homebrew: brew install node',
+        message: 'Node.js runtime not found in PATH',
+        suggestion: 'brew install node',
+        action: {
+          id: 'install-node',
+          label: 'Install Node.js',
+          type: 'install-package',
+          manager: 'brew',
+          packageName: 'node',
+        },
       });
     }
 
     // 5. npm check
     const npmRes = await safeExec('npm', ['-v']);
     if (npmRes.exitCode === 0) {
-      const whichRes = await safeExec('which', ['npm']);
       checks.push({
         id: 'pkg:npm',
         name: 'npm Package Manager',
         category: 'package_manager',
         status: 'healthy',
         version: npmRes.stdout.trim(),
-        path: whichRes.stdout.trim(),
-        message: `npm is ready for managing global and local Node packages`,
+        message: 'npm is ready for managing global and local Node packages',
       });
     } else {
       checks.push({
@@ -113,22 +146,19 @@ export class DoctorService {
         category: 'package_manager',
         status: 'warning',
         message: 'npm not found in PATH',
-        suggestion: 'Install Node.js to get npm: brew install node',
       });
     }
 
-    // 6. Python 3 & pip check
+    // 6. Python 3 check
     const pyRes = await safeExec('python3', ['--version']);
     if (pyRes.exitCode === 0) {
       const match = pyRes.stdout.match(/Python\s+([\d\.]+)/i);
-      const whichRes = await safeExec('which', ['python3']);
       checks.push({
         id: 'runtime:python3',
         name: 'Python 3',
         category: 'runtime',
         status: 'healthy',
         version: match ? match[1] : pyRes.stdout.trim(),
-        path: whichRes.stdout.trim(),
         message: 'Python 3 is available',
       });
     } else {
@@ -137,12 +167,19 @@ export class DoctorService {
         name: 'Python 3',
         category: 'runtime',
         status: 'warning',
-        message: 'Python 3 not found',
-        suggestion: 'Install Python via Homebrew: brew install python',
+        message: 'Python 3 not found in PATH',
+        suggestion: 'brew install python',
+        action: {
+          id: 'install-python',
+          label: 'Install Python',
+          type: 'install-package',
+          manager: 'brew',
+          packageName: 'python',
+        },
       });
     }
 
-    // 7. Docker check
+    // 7. Docker check (Actionable [Run] button to launch Docker Desktop!)
     const dockerRes = await safeExec('docker', ['--version']);
     if (dockerRes.exitCode === 0) {
       const daemonRes = await safeExec('docker', ['info'], { timeoutMs: 3000 });
@@ -156,8 +193,16 @@ export class DoctorService {
         version: dockerRes.stdout.trim(),
         message: isDaemonUp
           ? 'Docker CLI and Docker Daemon are active and running'
-          : 'Docker CLI is installed, but Docker Desktop daemon is not currently running',
+          : 'Docker CLI is installed, but Docker Desktop daemon is not currently running.',
         suggestion: isDaemonUp ? undefined : 'Launch Docker Desktop from /Applications/Docker.app',
+        action: isDaemonUp
+          ? undefined
+          : {
+              id: 'launch-docker',
+              label: 'Launch Docker Desktop',
+              type: 'launch-app',
+              application: 'Docker',
+            },
       });
     } else {
       checks.push({
@@ -166,7 +211,15 @@ export class DoctorService {
         category: 'container',
         status: 'not_installed',
         message: 'Docker is not installed',
-        suggestion: 'Install Docker Desktop: brew install --cask docker',
+        suggestion: 'brew install --cask docker',
+        action: {
+          id: 'install-docker',
+          label: 'Install Docker Desktop',
+          type: 'install-package',
+          manager: 'brew',
+          packageName: 'docker',
+          requiresTerminal: true,
+        },
       });
     }
 
@@ -207,11 +260,18 @@ export class DoctorService {
         category: 'mobile',
         status: 'not_installed',
         message: 'Android SDK platform-tools / adb not found',
-        suggestion: 'Install Android Command Line Tools or Android Studio: brew install --cask android-platform-tools',
+        suggestion: 'brew install --cask android-platform-tools',
+        action: {
+          id: 'install-adb',
+          label: 'Install Android Platform Tools',
+          type: 'install-package',
+          manager: 'brew',
+          packageName: 'android-platform-tools',
+        },
       });
     }
 
-    // 9. Cargo / Rust check
+    // 9. Cargo / Rust check (Actionable [Run] button to install rustup!)
     const cargoRes = await safeExec('cargo', ['--version']);
     if (cargoRes.exitCode === 0) {
       checks.push({
@@ -229,7 +289,14 @@ export class DoctorService {
         category: 'package_manager',
         status: 'not_installed',
         message: 'Rust / Cargo toolchain is not installed',
-        suggestion: 'Install Rust via rustup: curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh',
+        suggestion: 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh',
+        action: {
+          id: 'install-rust',
+          label: 'Install Rust via rustup',
+          type: 'command',
+          command: 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh',
+          requiresTerminal: true,
+        },
       });
     }
 

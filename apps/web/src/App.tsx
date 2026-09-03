@@ -8,8 +8,10 @@ import { PackageTable } from './components/packages/PackageTable';
 import { PackageDetailDrawer } from './components/packages/PackageDetailDrawer';
 import { InstallModal } from './components/packages/InstallModal';
 import { LiveTerminalDrawer } from './components/terminal/LiveTerminalDrawer';
+import { EmbeddedTerminalPanel } from './components/terminal/EmbeddedTerminalPanel';
 import { PrivilegedDialog } from './components/terminal/PrivilegedDialog';
 import { DoctorView } from './components/doctor/DoctorView';
+import { PortsView } from './components/ports/PortsView';
 import { ProcessView } from './components/processes/ProcessView';
 import { ContainersView } from './components/containers/ContainersView';
 import { HistoryView } from './components/history/HistoryView';
@@ -22,6 +24,7 @@ export function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isTerminalPanelOpen, setIsTerminalPanelOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const { startJob, setPrivilegedDialog } = useTerminal();
@@ -49,6 +52,17 @@ export function App() {
     refetchInterval: 60000,
   });
 
+  // Ports query
+  const {
+    data: portsData,
+    isLoading: isPortsLoading,
+    refetch: refetchPorts,
+  } = useQuery({
+    queryKey: ['ports'],
+    queryFn: api.getPorts,
+    refetchInterval: 10000,
+  });
+
   // Doctor query
   const {
     data: doctorData,
@@ -68,6 +82,16 @@ export function App() {
     queryKey: ['processes'],
     queryFn: api.getProcesses,
     refetchInterval: 10000,
+  });
+
+  // Services query
+  const {
+    data: servicesData,
+    refetch: refetchServices,
+  } = useQuery({
+    queryKey: ['services'],
+    queryFn: api.getServices,
+    refetchInterval: 15000,
   });
 
   // Containers query
@@ -219,10 +243,17 @@ export function App() {
     }
   };
 
+  const handleSelectPackageById = async (pkgId: string) => {
+    const pkg = await api.getPackage(pkgId).catch(() => null);
+    if (pkg) {
+      setSelectedPackage(pkg);
+    }
+  };
+
   const getTabTitle = () => {
     switch (currentTab) {
       case 'overview':
-        return 'System Overview & Dashboard';
+        return 'System Overview & Host Dashboard';
       case 'all-packages':
         return 'All Installed Software';
       case 'brew':
@@ -233,16 +264,18 @@ export function App() {
         return 'Python pip3 Packages';
       case 'cargo':
         return 'Cargo Rust Binaries';
+      case 'ports':
+        return 'Listening Network Ports';
       case 'doctor':
-        return 'Environment Doctor';
+        return 'Environment Doctor & Tool Diagnostics';
       case 'processes':
-        return 'Dev Processes & Listening Ports';
+        return 'Processes & Developer Services';
       case 'containers':
         return 'Docker Containers & Android ADB';
       case 'history':
         return 'Audit Logs & Operation History';
       case 'settings':
-        return 'Settings & Localhost Security';
+        return 'Settings & Cross-Platform Security';
       default:
         return 'PACKAGE GUI';
     }
@@ -269,6 +302,8 @@ export function App() {
           onRefresh={handleRefresh}
           isRefreshing={isOverviewFetching || isPackagesFetching}
           onOpenInstallModal={() => setIsInstallModalOpen(true)}
+          isTerminalPanelOpen={isTerminalPanelOpen}
+          onToggleTerminalPanel={() => setIsTerminalPanelOpen(!isTerminalPanelOpen)}
           title={getTabTitle()}
         />
 
@@ -299,6 +334,15 @@ export function App() {
             />
           )}
 
+          {currentTab === 'ports' && (
+            <PortsView
+              ports={portsData?.ports || []}
+              isLoading={isPortsLoading}
+              onRefresh={() => refetchPorts()}
+              onSelectPackageId={handleSelectPackageById}
+            />
+          )}
+
           {currentTab === 'doctor' && (
             <DoctorView
               checks={doctorData?.checks || []}
@@ -310,8 +354,12 @@ export function App() {
           {currentTab === 'processes' && (
             <ProcessView
               processes={processesData?.processes || []}
+              services={servicesData?.services || []}
               isLoading={isProcessesLoading}
-              onRefresh={() => refetchProcesses()}
+              onRefresh={() => {
+                refetchProcesses();
+                refetchServices();
+              }}
             />
           )}
 
@@ -351,10 +399,17 @@ export function App() {
       {/* Install Package Modal */}
       <InstallModal isOpen={isInstallModalOpen} onClose={() => setIsInstallModalOpen(false)} />
 
-      {/* Live Terminal Drawer */}
+      {/* Live Command Logs Drawer (PACKAGE GUI operations) */}
       <LiveTerminalDrawer />
 
-      {/* Native macOS Terminal Privileged Confirmation Dialog */}
+      {/* Embedded Interactive Shell Terminal Panel (xterm.js) */}
+      <EmbeddedTerminalPanel
+        isOpen={isTerminalPanelOpen}
+        onClose={() => setIsTerminalPanelOpen(false)}
+        shellName={overview?.os?.shell || 'zsh'}
+      />
+
+      {/* Native Privileged Confirmation Dialog */}
       <PrivilegedDialog />
     </div>
   );

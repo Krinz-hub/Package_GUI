@@ -6,14 +6,13 @@ import {
   Terminal,
   Activity,
   Cpu,
+  Radio,
   History,
   Settings,
-  Sparkles,
   Smartphone,
   CheckCircle2,
-  AlertTriangle,
 } from 'lucide-react';
-import { PackageManagerType, SystemOverview } from '@stuff-manager/shared';
+import { SystemOverview } from '@stuff-manager/shared';
 
 export type NavTab =
   | 'overview'
@@ -22,8 +21,9 @@ export type NavTab =
   | 'npm'
   | 'pip'
   | 'cargo'
-  | 'containers'
+  | 'ports'
   | 'processes'
+  | 'containers'
   | 'doctor'
   | 'history'
   | 'settings';
@@ -41,6 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, overv
   const cargoCount = overview?.managers.find((m) => m.id === 'cargo')?.packageCount || 0;
   const totalPackages = overview?.totalPackages || 0;
   const updatesCount = overview?.totalUpdates || 0;
+  const portsCount = overview?.totalPorts || 0;
 
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -59,13 +60,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, overv
 
   const systemItems = [
     {
+      id: 'ports',
+      label: 'Listening Ports',
+      icon: Radio,
+      badge: portsCount > 0 ? portsCount : undefined,
+    },
+    {
+      id: 'processes',
+      label: 'Processes & Services',
+      icon: Cpu,
+      badge: overview?.runningProcessesCount,
+    },
+    {
       id: 'doctor',
       label: 'Environment Doctor',
       icon: Activity,
       alert: overview?.doctorIssuesCount ? `${overview.doctorIssuesCount} issues` : undefined,
     },
     { id: 'containers', label: 'Containers & ADB', icon: Smartphone },
-    { id: 'processes', label: 'Processes & Ports', icon: Cpu, badge: overview?.runningProcessesCount },
     { id: 'history', label: 'Operation History', icon: History },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -104,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, overv
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id as NavTab)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   active
                     ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
@@ -128,10 +140,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, overv
           })}
         </div>
 
-        {/* Diagnostics & Runtime */}
+        {/* Diagnostics, Ports, Processes */}
         <div className="space-y-1">
           <div className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
-            System & Tools
+            System & Runtime
           </div>
           {systemItems.map((item) => {
             const Icon = item.icon;
@@ -140,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, overv
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id as NavTab)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   active
                     ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
@@ -169,16 +181,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, overv
       {/* System Status Footer */}
       <div className="p-3 m-3 rounded-xl bg-slate-900/80 border border-slate-800/80 text-xs text-slate-400 space-y-1.5">
         <div className="flex items-center justify-between font-mono text-[11px] text-slate-300">
-          <span className="text-slate-400">macOS {overview?.os.release ? overview.os.release.split('.')[0] : 'Darwin'}</span>
-          <span className="text-emerald-400 flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> Secure
+          <span className="text-slate-300 font-semibold truncate pr-2">
+            {overview?.os?.displayName ? overview.os.displayName.split('(')[0].trim() : 'Local Node'}
+          </span>
+          <span className="text-emerald-400 flex items-center gap-1 flex-shrink-0">
+            <CheckCircle2 className="w-3 h-3" /> Ready
           </span>
         </div>
-        <div className="text-[11px] text-slate-400 flex items-center justify-between">
-          <span>Updates available</span>
-          <span className={`font-mono font-semibold ${updatesCount > 0 ? 'text-blue-400' : 'text-slate-400'}`}>
-            {updatesCount}
-          </span>
+        <div className="text-[11px] text-slate-400 flex items-center justify-between font-mono">
+          <span>Shell: {overview?.os?.shell || 'default'}</span>
+          <span className="text-blue-400 font-semibold">{updatesCount} updates</span>
         </div>
       </div>
     </aside>

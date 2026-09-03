@@ -13,8 +13,9 @@ import {
   Folder,
   Layers,
   AlertCircle,
-  Clock,
   FileCode,
+  Radio,
+  Cpu,
 } from 'lucide-react';
 import { Package } from '@stuff-manager/shared';
 
@@ -140,7 +141,7 @@ export const PackageDetailDrawer: React.FC<PackageDetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* Description & Links */}
+          {/* Description */}
           {packageData.description && (
             <div className="space-y-1.5">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Description</h4>
@@ -235,7 +236,6 @@ export const PackageDetailDrawer: React.FC<PackageDetailDrawerProps> = ({
             </button>
           </div>
 
-          {/* Privileged in macOS Terminal button */}
           <button
             onClick={() => onUpdate(packageData, true)}
             className="w-full py-2 rounded-lg bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-slate-200 text-xs font-mono flex items-center justify-center gap-2 border border-slate-800 transition-all"

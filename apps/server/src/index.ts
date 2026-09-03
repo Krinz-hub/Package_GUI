@@ -5,6 +5,7 @@ import { packageRoutes } from './routes/packages.js';
 import { overviewRoutes } from './routes/overview.js';
 import { doctorRoutes } from './routes/doctor.js';
 import { processRoutes } from './routes/processes.js';
+import { portRoutes } from './routes/ports.js';
 import { containerRoutes } from './routes/containers.js';
 import { historyRoutes } from './routes/history.js';
 import { websocketRoutes } from './routes/ws.js';
@@ -37,6 +38,7 @@ async function buildServer() {
   await fastify.register(packageRoutes, { prefix: '/api' });
   await fastify.register(doctorRoutes, { prefix: '/api' });
   await fastify.register(processRoutes, { prefix: '/api' });
+  await fastify.register(portRoutes, { prefix: '/api' });
   await fastify.register(containerRoutes, { prefix: '/api' });
   await fastify.register(historyRoutes, { prefix: '/api' });
 
@@ -52,9 +54,10 @@ async function start() {
 │                                                            │
 │   🚀 PACKAGE GUI — Local Developer Backend                 │
 │                                                            │
-│   • Local API:    http://${HOST}:${PORT}/api/overview         │
-│   • Live WS:      ws://${HOST}:${PORT}/ws                    │
-│   • Host binding: ${HOST} (Localhost Only)                │
+│   • Local API:        http://${HOST}:${PORT}/api/overview     │
+│   • Live Logs WS:     ws://${HOST}:${PORT}/ws                │
+│   • Interactive PTY:  ws://${HOST}:${PORT}/ws/terminal       │
+│   • Host binding:     ${HOST} (Localhost Only)            │
 │                                                            │
 └────────────────────────────────────────────────────────────┘
     `);

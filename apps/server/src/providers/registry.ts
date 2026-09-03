@@ -12,17 +12,45 @@ import { pipProvider } from './pip.js';
 import { cargoProvider } from './cargo.js';
 import { dockerProvider } from './docker.js';
 import { androidProvider } from './android.js';
+import { wingetProvider } from './winget.js';
+import { chocolateyProvider } from './chocolatey.js';
+import { scoopProvider } from './scoop.js';
+import { aptProvider } from './apt.js';
+import { dnfProvider } from './dnf.js';
+import { pacmanProvider } from './pacman.js';
+import { platform } from '../platform/platform.js';
 
 export class ProviderRegistry {
   private providers = new Map<PackageManagerType, PackageManagerProvider>();
 
   constructor() {
-    this.register(brewProvider);
+    this.initProviders();
+  }
+
+  private initProviders() {
+    const plat = os.platform();
+
+    // Universal / language package managers
     this.register(npmProvider);
     this.register(pipProvider);
     this.register(cargoProvider);
     this.register(dockerProvider);
     this.register(androidProvider);
+
+    // Platform-specific managers
+    if (plat === 'darwin') {
+      this.register(brewProvider);
+    } else if (plat === 'win32') {
+      this.register(wingetProvider);
+      this.register(chocolateyProvider);
+      this.register(scoopProvider);
+    } else {
+      // Linux
+      this.register(aptProvider);
+      this.register(dnfProvider);
+      this.register(pacmanProvider);
+      this.register(brewProvider); // Linuxbrew
+    }
   }
 
   public register(provider: PackageManagerProvider): void {
@@ -71,7 +99,6 @@ export class ProviderRegistry {
     if (provider) {
       return provider.info(id);
     }
-    // Search all providers
     for (const p of this.getAll()) {
       const pkg = await p.info(id).catch(() => null);
       if (pkg) return pkg;
@@ -93,21 +120,16 @@ export class ProviderRegistry {
   }
 
   public async getOverview(): Promise<SystemOverview> {
-    const [managers, allPackages] = await Promise.all([
+    const [managers, allPackages, osInfo] = await Promise.all([
       this.detectAll(),
       this.listAll(),
+      platform.getOSInfo(),
     ]);
 
     const totalUpdates = allPackages.filter((p) => p.updateAvailable).length;
 
     return {
-      os: {
-        platform: os.platform(),
-        release: os.release(),
-        arch: os.arch(),
-        hostname: os.hostname(),
-        uptime: os.uptime(),
-      },
+      os: osInfo,
       totalPackages: allPackages.length,
       totalUpdates,
       managers,

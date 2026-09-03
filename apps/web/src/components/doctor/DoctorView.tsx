@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Activity,
   CheckCircle2,
@@ -6,12 +6,16 @@ import {
   XCircle,
   HelpCircle,
   RotateCw,
-  Terminal,
   Folder,
   Copy,
   Check,
+  Play,
+  ExternalLink,
+  Shield,
 } from 'lucide-react';
-import { DoctorCheck } from '@stuff-manager/shared';
+import { DoctorCheck, DoctorAction } from '@stuff-manager/shared';
+import { api } from '../../api/client';
+import { useTerminal } from '../../context/TerminalContext';
 
 interface DoctorViewProps {
   checks: DoctorCheck[];
@@ -20,12 +24,55 @@ interface DoctorViewProps {
 }
 
 export const DoctorView: React.FC<DoctorViewProps> = ({ checks, isLoading, onRefresh }) => {
-  const [copiedCmd, setCopiedCmd] = React.useState<string | null>(null);
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
+  const [runningActionId, setRunningActionId] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ id: string; message: string; isError?: boolean } | null>(null);
+  const { startJob, setPrivilegedDialog } = useTerminal();
 
   const copyCmd = (cmd: string) => {
     navigator.clipboard.writeText(cmd);
     setCopiedCmd(cmd);
     setTimeout(() => setCopiedCmd(null), 2000);
+  };
+
+  const handleRunAction = async (action: DoctorAction) => {
+    if (action.requiresTerminal && action.type === 'command') {
+      setPrivilegedDialog({
+        isOpen: true,
+        jobName: action.label,
+        command: action.command || action.label,
+        onConfirm: async () => {
+          setRunningActionId(action.id);
+          try {
+            const res = await api.runDoctorAction(action);
+            if (res.job) startJob(res.job);
+            setActionFeedback({ id: action.id, message: res.message || 'Action launched' });
+            setTimeout(() => onRefresh(), 2000);
+          } catch (err: any) {
+            setActionFeedback({ id: action.id, message: err.message, isError: true });
+          } finally {
+            setRunningActionId(null);
+          }
+        },
+        onCancel: () => {},
+      });
+      return;
+    }
+
+    setRunningActionId(action.id);
+    setActionFeedback(null);
+    try {
+      const res = await api.runDoctorAction(action);
+      if (res.job) {
+        startJob(res.job);
+      }
+      setActionFeedback({ id: action.id, message: res.message || 'Action executed successfully' });
+      setTimeout(() => onRefresh(), 3000);
+    } catch (err: any) {
+      setActionFeedback({ id: action.id, message: err.message, isError: true });
+    } finally {
+      setRunningActionId(null);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -69,7 +116,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({ checks, isLoading, onRef
           <div>
             <h3 className="text-xl font-bold text-white tracking-tight">Environment Doctor</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Automatic inspection of your macOS developer toolchain, PATH integrity, and runtimes
+              Automated diagnostics of your local toolchains, PATH configuration, runtimes, and actionable remediation
             </p>
           </div>
         </div>
@@ -86,56 +133,114 @@ export const DoctorView: React.FC<DoctorViewProps> = ({ checks, isLoading, onRef
 
       {/* Diagnostics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {checks.map((check) => (
-          <div
-            key={check.id}
-            className="glass-card p-5 rounded-2xl space-y-3 flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-white text-base">{check.name}</h4>
-                  {check.version && (
-                    <span className="px-2 py-0.5 text-xs font-mono rounded bg-slate-800 text-slate-300">
-                      {check.version}
-                    </span>
-                  )}
+        {checks.map((check) => {
+          const isActionRunning = runningActionId === check.action?.id;
+          const currentFeedback = actionFeedback?.id === check.action?.id ? actionFeedback : null;
+
+          return (
+            <div
+              key={check.id}
+              className="glass-card p-5 rounded-2xl space-y-3 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-white text-base">{check.name}</h4>
+                    {check.version && (
+                      <span className="px-2 py-0.5 text-xs font-mono rounded bg-slate-800 text-slate-300">
+                        {check.version}
+                      </span>
+                    )}
+                  </div>
+                  {getStatusBadge(check.status)}
                 </div>
-                {getStatusBadge(check.status)}
+
+                <p className="text-xs text-slate-300 mt-2 leading-relaxed">{check.message}</p>
+
+                {check.path && (
+                  <div className="mt-3 flex items-center gap-1.5 font-mono text-[11px] text-slate-400 truncate bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                    <Folder className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    <span className="truncate">{check.path}</span>
+                  </div>
+                )}
               </div>
 
-              <p className="text-xs text-slate-300 mt-2 leading-relaxed">{check.message}</p>
+              {/* Actionable Recommendation Card with [ Run ] and [ Copy ] Buttons */}
+              {(check.action || check.suggestion) && (
+                <div className="mt-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-amber-300 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                      Recommendation: {check.action?.label || 'Action Required'}
+                    </span>
+                  </div>
 
-              {check.path && (
-                <div className="mt-3 flex items-center gap-1.5 font-mono text-[11px] text-slate-400 truncate bg-slate-900/60 p-2 rounded-lg border border-slate-800">
-                  <Folder className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                  <span className="truncate">{check.path}</span>
+                  {check.suggestion && (
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/90 font-mono text-[11px] text-amber-100 border border-amber-500/20">
+                      <span className="truncate pr-2">{check.suggestion}</span>
+                      <button
+                        onClick={() => copyCmd(check.suggestion!)}
+                        className="text-amber-300 hover:text-white transition-colors p-1"
+                        title="Copy command"
+                      >
+                        {copiedCmd === check.suggestion ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Action execution buttons */}
+                  {check.action && (
+                    <div className="flex items-center justify-between pt-1 gap-2">
+                      <div className="text-[11px] text-slate-400">
+                        {currentFeedback ? (
+                          <span className={currentFeedback.isError ? 'text-red-400' : 'text-emerald-400'}>
+                            {currentFeedback.message}
+                          </span>
+                        ) : check.action.requiresTerminal ? (
+                          <span className="flex items-center gap-1 text-slate-400">
+                            <Shield className="w-3 h-3 text-amber-400" />
+                            Admin permission via Terminal
+                          </span>
+                        ) : (
+                          <span>Safe local action</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {check.suggestion && (
+                          <button
+                            onClick={() => copyCmd(check.suggestion!)}
+                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-all flex items-center gap-1.5"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>Copy</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleRunAction(check.action!)}
+                          disabled={isActionRunning}
+                          className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-glow-primary transition-all flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {isActionRunning ? (
+                            <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                          )}
+                          <span>Run</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-
-            {check.suggestion && (
-              <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 space-y-1.5">
-                <span className="font-semibold text-amber-300 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" /> Recommendation:
-                </span>
-                <div className="flex items-center justify-between p-2 rounded bg-slate-950 font-mono text-[11px] text-amber-100">
-                  <span className="truncate pr-2">{check.suggestion}</span>
-                  <button
-                    onClick={() => copyCmd(check.suggestion!)}
-                    className="text-amber-300 hover:text-white transition-colors"
-                  >
-                    {copiedCmd === check.suggestion ? (
-                      <Check className="w-3 h-3 text-emerald-400" />
-                    ) : (
-                      <Copy className="w-3 h-3" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
