@@ -1,28 +1,30 @@
 # PACKAGE GUI
 
-A local-first GUI dashboard for managing your development environment, package managers, listening ports, and background services across **macOS**, **Windows**, and **Linux**.
+A local GUI for managing your development environment.
 
----
-
-## ⚡ Install
+## Install
 
 ```bash
 npm install -g package-gui
 ```
 
-## 🚀 Run
+## Run
 
 ```bash
 pakage
 ```
 
-or:
+That's it.
+
+PACKAGE GUI will start locally and open the dashboard in your browser.
+
+Also support:
 
 ```bash
 pakage gui
 ```
 
-That's it! PACKAGE GUI will start locally and automatically open the dashboard in your default browser.
+Expected terminal output:
 
 ```text
 PACKAGE GUI v1.0.0
@@ -36,16 +38,20 @@ PACKAGE GUI v1.0.0
 ✓ Detecting development environments
 
 Dashboard:
-http://127.0.0.1:7421
+http://localhost:7421
 
 Opening browser...
 ```
 
 ---
 
-## 🛑 Stop
+## Stop
 
-Press `Ctrl+C` in your terminal, or run:
+```text
+Ctrl+C
+```
+
+or:
 
 ```bash
 pakage stop
@@ -53,63 +59,42 @@ pakage stop
 
 ---
 
-## 🩺 Diagnostics (Doctor)
-
-Run a complete system and environment health check:
+## Diagnostics
 
 ```bash
 pakage doctor
 ```
 
-Inspects:
-- Node.js & npm runtimes
-- Production server and frontend build integrity
-- Localhost (127.0.0.1) loopback socket availability
-- System commands & Git
-- Detected package managers (Homebrew, npm, pip, Cargo, WinGet, Chocolatey, Scoop, APT, DNF, Pacman)
-- Python environments & PEP 668 externally-managed safety
+Inspects your development environment:
+- Node.js & npm runtime versions
+- Backend & frontend production bundle integrity
+- Localhost (`127.0.0.1`) loopback socket availability
+- System tools (Git, curl)
+- Package managers (Homebrew, npm, pip, Cargo, WinGet, Chocolatey, Scoop, APT, DNF, Pacman)
+- Python environment status & PEP 668 externally-managed safety
 - Docker Engine & daemon status
-- Android SDK & ADB connection
-- User data directory permissions
+- Android SDK & ADB devices
+- User configuration directory permissions
 
 ---
 
-## 📊 Status
-
-Inspect your active local instance and environment summary:
+## Status
 
 ```bash
 pakage status
 ```
 
+Displays active server status, dashboard URL, PID, port, operating system, detected package managers, package counts, listening ports, and monitored processes.
+
 ---
 
-## 📜 Logs
-
-View recent logs or follow live runtime output:
+## Help
 
 ```bash
-# View last 50 log lines
-pakage logs
-
-# Follow live output stream
-pakage logs -f
-
-# View last 100 log lines
-pakage logs -n 100
+pakage --help
 ```
 
----
-
-## 🔄 Check for Updates
-
-```bash
-pakage update
-```
-
----
-
-## ⚙️ CLI Options
+### CLI Options
 
 ```text
 USAGE:
@@ -135,37 +120,62 @@ OPTIONS:
 
 ---
 
-## 🌐 Cross-Platform Support
+## Logs
 
-PACKAGE GUI is fully cross-platform and adapts to your operating system:
+```bash
+# View recent logs
+pakage logs
 
-- **macOS**: Native Homebrew (Formulae & Casks), global npm, pip, Cargo, Docker, Android ADB, and native Terminal privilege flow for elevated actions.
-- **Windows**: WinGet, Chocolatey, Scoop, npm, pip, Cargo, Docker, and background service inspection.
+# Follow live output stream
+pakage logs -f
+
+# View specific number of lines
+pakage logs -n 100
+```
+
+---
+
+## Updates
+
+```bash
+pakage update
+```
+
+Checks the npm registry for newer versions of `package-gui`.
+
+---
+
+## Cross-Platform Support
+
+PACKAGE GUI works across:
+
+- **macOS**: Homebrew (Formulae & Casks), global npm, pip, Cargo, Docker, Android ADB, and native Terminal privilege flow for elevated actions.
+- **Windows**: WinGet, Chocolatey, Scoop, npm, pip, Cargo, Docker, and background services.
 - **Linux**: APT, DNF, Pacman, Homebrew on Linux, npm, pip, Cargo, Docker, and system services.
 
 ---
 
-## 🛡️ Security Model
+## Security
 
-1. **Strict Localhost Only**: The local server binds to `127.0.0.1` by default — never exposed to the public network.
-2. **Zero Password Collection**: Administrator / sudo passwords are **never** requested inside the browser. Any elevated operation utilizes your system's native terminal authentication flow.
-3. **No External Dependencies**: No remote databases, no tracking, and no external accounts required.
+- **Strict Localhost Binding**: PACKAGE GUI binds to `127.0.0.1` by default and is never exposed to the public network without explicit configuration.
+- **Zero Sudo Password in Browser**: Administrator passwords are never entered or captured in the browser. Elevated actions use your system's native terminal authentication.
+- **Local-First**: Runs 100% on your machine with no external databases or telemetry.
 
 ---
 
-## 🧑‍💻 Developer Setup (Contributing)
+## Developer Setup
 
-If you are contributing to PACKAGE GUI or developing locally:
+For contributing or running from source:
 
 ```bash
 # Clone the repository
 git clone https://github.com/Krinz-hub/stuff-manager.git
 cd stuff-manager
 
-# Install development dependencies
+# Install dependencies
 npm install
 
-# Start development servers (Hot Reloading Frontend + Backend)
+# Start development servers (Frontend + Backend with hot reload)
 npm run dev
 
 # Build production bundle
@@ -177,6 +187,6 @@ node bin/pakage.js
 
 ---
 
-## 📜 License
+## License
 
 MIT License.
