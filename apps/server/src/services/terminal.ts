@@ -115,6 +115,13 @@ export class TerminalService {
       this.sessions.delete(session);
     });
   }
+
+  public destroyAll() {
+    for (const session of this.sessions) {
+      session.destroy();
+    }
+    this.sessions.clear();
+  }
 }
 
 export const terminalService = new TerminalService();

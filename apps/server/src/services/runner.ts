@@ -179,6 +179,16 @@ export class RunnerService {
   public getRecentJobs(limit = 30): OperationLog[] {
     return dbService.getHistory(limit);
   }
+
+  public destroyAll(): void {
+    for (const ws of this.wsClients) {
+      try {
+        ws.close();
+      } catch (_) {}
+    }
+    this.wsClients.clear();
+    this.activeJobs.clear();
+  }
 }
 
 export const runnerService = new RunnerService();

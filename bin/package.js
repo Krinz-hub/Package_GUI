@@ -85,11 +85,82 @@ export function clearState() {
 
 // Check if a process with PID is alive
 export function isProcessRunning(pid) {
+  if (!pid || typeof pid !== 'number') return false;
   try {
     process.kill(pid, 0);
     return true;
   } catch (err) {
-    return err.code === 'EPERM';
+    return err.code === 'EPERM'; // Alive but different permissions
+  }
+}
+
+// Find child PIDs recursively on Unix
+export function getChildPids(parentPid) {
+  if (!parentPid || process.platform === 'win32') return [];
+  try {
+    const out = execSync(`pgrep -P ${parentPid}`, {
+      stdio: ['pipe', 'pipe', 'ignore'],
+      encoding: 'utf8',
+      timeout: 1000,
+    });
+    const directChildren = out
+      .split('\n')
+      .map((p) => parseInt(p.trim(), 10))
+      .filter((p) => !isNaN(p) && p > 0);
+    let all = [...directChildren];
+    for (const childPid of directChildren) {
+      all = all.concat(getChildPids(childPid));
+    }
+    return all;
+  } catch (_) {
+    return [];
+  }
+}
+
+// Cross-platform Process Tree Killer with Graceful SIGTERM -> Timeout -> SIGKILL
+export async function killProcessTree(pid, force = false, timeoutMs = 2500) {
+  if (!pid || !isProcessRunning(pid)) return;
+
+  if (process.platform === 'win32') {
+    try {
+      execSync(`taskkill /T ${force ? '/F' : ''} /PID ${pid}`, { stdio: 'ignore', timeout: 3000 });
+    } catch (_) {
+      try {
+        execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore', timeout: 3000 });
+      } catch (_) {}
+    }
+    return;
+  }
+
+  const childPids = getChildPids(pid);
+  const allPids = [...childPids, pid];
+
+  const signal = force ? 'SIGKILL' : 'SIGTERM';
+  for (const p of allPids) {
+    try {
+      process.kill(p, signal);
+    } catch (_) {}
+  }
+
+  if (force) return;
+
+  // Poll until process exits or timeout expires
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (!isProcessRunning(pid)) {
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  // If still alive after timeout, send SIGKILL to the entire tree
+  if (isProcessRunning(pid)) {
+    const remaining = [...getChildPids(pid), pid];
+    for (const p of remaining) {
+      try {
+        process.kill(p, 'SIGKILL');
+      } catch (_) {}
+    }
   }
 }
 
@@ -109,6 +180,18 @@ export async function isPortAvailable(port, host = '127.0.0.1') {
     });
     server.listen(port, host);
   });
+}
+
+// Verify port has been released with polling
+export async function verifyPortReleased(port, host = '127.0.0.1', maxWaitMs = 2000) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    if (await isPortAvailable(port, host)) {
+      return true;
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return await isPortAvailable(port, host);
 }
 
 // Find available port
@@ -183,7 +266,6 @@ export function openBrowser(url) {
     } else if (platform === 'win32') {
       spawn('cmd.exe', ['/c', 'start', '""', url], { stdio: 'ignore', detached: true }).unref();
     } else {
-      // Linux / Unix
       const candidateOpeners = ['xdg-open', 'gio', 'gnome-open', 'kde-open', 'x-www-browser'];
       let opened = false;
       for (const opener of candidateOpeners) {
@@ -328,18 +410,8 @@ async function handleStop() {
 
   console.log(`Stopping PACKAGE GUI server (PID: ${state.pid}, Port: ${state.port})...`);
   try {
-    if (process.platform === 'win32') {
-      execSync(`taskkill /F /PID ${state.pid}`, { stdio: 'ignore' });
-    } else {
-      process.kill(state.pid, 'SIGTERM');
-      for (let i = 0; i < 20; i++) {
-        if (!isProcessRunning(state.pid)) break;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      if (isProcessRunning(state.pid)) {
-        process.kill(state.pid, 'SIGKILL');
-      }
-    }
+    await killProcessTree(state.pid, false, 2500);
+    await verifyPortReleased(state.port, state.host || '127.0.0.1', 2000);
     clearState();
     console.log('✓ PACKAGE GUI server stopped successfully.\n');
   } catch (err) {
@@ -708,12 +780,65 @@ async function handleLaunch(args) {
   }
 
   let serverExited = false;
-  serverProc.on('exit', (code) => {
-    serverExited = true;
-    appendToLog(`Server process exited with code ${code}`);
+  let exitCode = 0;
+
+  // Shutdown State Machine
+  let isShuttingDown = false;
+  let isForceShuttingDown = false;
+
+  const performShutdown = async (isForced = false) => {
+    if (isShuttingDown && !isForced) return;
+    if (isForced) {
+      if (isForceShuttingDown) return;
+      isForceShuttingDown = true;
+      console.log('\nShutdown taking too long. Force stopping PACKAGE GUI...');
+    } else {
+      isShuttingDown = true;
+      console.log('\nStopping PACKAGE GUI...');
+    }
+
+    appendToLog(`Initiating ${isForced ? 'FORCED ' : ''}shutdown for server (PID: ${serverProc.pid})`);
+
+    try {
+      if (serverProc.pid && !serverExited) {
+        await killProcessTree(serverProc.pid, isForced, 2500);
+      }
+    } catch (_) {}
+
+    // Verify port has been completely released
+    try {
+      await verifyPortReleased(activePort, host, 2000);
+    } catch (_) {}
+
     clearState();
-    if (code !== 0 && code !== null) {
-      console.error(`\n❌ Server process stopped unexpectedly (exit code ${code}). Check logs with 'package logs'.`);
+    appendToLog('PACKAGE GUI server stopped and port released.');
+    console.log('PACKAGE GUI stopped.');
+    process.exit(0);
+  };
+
+  const onSignal = () => {
+    if (isShuttingDown) {
+      // User pressed Ctrl+C a second time during graceful shutdown
+      performShutdown(true);
+    } else {
+      performShutdown(false);
+    }
+  };
+
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+
+  serverProc.on('exit', (code, signal) => {
+    serverExited = true;
+    exitCode = code !== null ? code : (signal ? 1 : 0);
+    appendToLog(`Server process exited (code: ${code}, signal: ${signal})`);
+
+    if (!isShuttingDown) {
+      clearState();
+      if (code !== 0 && code !== null) {
+        console.error(`\n❌ Server process stopped unexpectedly (exit code ${code}). Check logs with 'package logs'.`);
+      }
+      process.exit(exitCode || 1);
     }
   });
 
@@ -730,31 +855,11 @@ async function handleLaunch(args) {
     });
   }
 
-  // Handle Ctrl+C clean shutdown
-  const cleanExit = () => {
-    try {
-      appendToLog('Received shutdown signal, terminating server process');
-      clearState();
-      if (!serverExited && serverProc.pid) {
-        if (process.platform === 'win32') {
-          execSync(`taskkill /F /PID ${serverProc.pid}`, { stdio: 'ignore' });
-        } else {
-          serverProc.kill('SIGTERM');
-        }
-      }
-    } catch (_) {}
-    console.log('\nPACKAGE GUI stopped.');
-    process.exit(0);
-  };
-
-  process.on('SIGINT', cleanExit);
-  process.on('SIGTERM', cleanExit);
-
   // 5. Poll for backend health
   let isReady = false;
   for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 250));
-    if (serverExited) break;
+    if (serverExited || isShuttingDown) break;
     const health = await checkBackendHealth(host, activePort, 600);
     if (health.ok) {
       isReady = true;
@@ -762,10 +867,12 @@ async function handleLaunch(args) {
     }
   }
 
+  if (isShuttingDown) return;
+
   if (!isReady) {
     console.error(`\n❌ PACKAGE GUI failed to start on port ${activePort}.`);
     console.error(`Inspect error logs with: package logs\n`);
-    cleanExit();
+    await performShutdown(true);
     return;
   }
 
@@ -820,7 +927,6 @@ async function main() {
       break;
     default:
       if (command.startsWith('-')) {
-        // Flag passed without subcommand e.g. "package --port 7421"
         await handleLaunch(rawArgs);
       } else {
         console.error(`Unknown command: ${command}\n`);

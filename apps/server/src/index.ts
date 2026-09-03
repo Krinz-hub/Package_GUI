@@ -119,10 +119,33 @@ export async function buildServer() {
   return fastify;
 }
 
+import { terminalService } from './services/terminal.js';
+import { runnerService } from './services/runner.js';
+
+let activeServer: any = null;
+let isShuttingDown = false;
+
+export async function gracefulShutdown(signal = 'SIGTERM') {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  try {
+    terminalService.destroyAll();
+    runnerService.destroyAll();
+    if (activeServer) {
+      await activeServer.close();
+      activeServer = null;
+    }
+  } catch (_) {}
+  process.exit(0);
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
 async function start() {
   try {
-    const server = await buildServer();
-    await server.listen({ port: PORT, host: HOST });
+    activeServer = await buildServer();
+    await activeServer.listen({ port: PORT, host: HOST });
     console.log(`
 ┌────────────────────────────────────────────────────────────┐
 │                                                            │
