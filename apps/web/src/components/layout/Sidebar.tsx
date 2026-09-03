@@ -129,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </h1>
             <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              localhost:4173
+              {typeof window !== "undefined" ? window.location.host : "127.0.0.1:7421"}
             </div>
           </div>
         </div>

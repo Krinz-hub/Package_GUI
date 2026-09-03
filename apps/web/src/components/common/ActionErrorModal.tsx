@@ -226,7 +226,7 @@ export const ActionErrorModal: React.FC<ActionErrorModalProps> = ({
             <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 space-y-1">
               <div className="font-semibold">Troubleshooting Tip:</div>
               <p className="text-slate-400">
-                Ensure the PACKAGE GUI backend server is active on 127.0.0.1:4173. Run with --debug for full traces.
+                Ensure the PACKAGE GUI backend server is active on {typeof window !== 'undefined' ? window.location.host : '127.0.0.1:7421'}. Run with --debug for full traces.
               </p>
             </div>
           )}

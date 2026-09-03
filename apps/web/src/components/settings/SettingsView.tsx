@@ -44,7 +44,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ overview }) => {
               <span>Strictly Local Execution</span>
             </div>
             <p className="text-slate-400 leading-relaxed">
-              Bound exclusively to <code className="text-blue-300">127.0.0.1:4173</code>. No external telemetry or cloud dependencies.
+              Bound exclusively to <code className="text-blue-300">{typeof window !== 'undefined' ? window.location.host : '127.0.0.1:7421'}</code>. No external telemetry or cloud dependencies.
             </p>
           </div>
 
