@@ -1,0 +1,22 @@
+{
+  "name": "stuff-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PACKAGE GUI — Local-first Developer Package Management Dashboard for macOS",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "cli"
+  ],
+  "scripts": {
+    "dev": "concurrently -n \"server,web\" -c \"blue,cyan\" \"npm run dev -w apps/server\" \"npm run dev -w apps/web\"",
+    "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
+    "start": "node apps/server/dist/index.js",
+    "start:gui": "tsx cli/bin.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

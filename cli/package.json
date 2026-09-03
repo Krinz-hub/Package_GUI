@@ -1,0 +1,14 @@
+{
+  "name": "package-gui",
+  "version": "1.0.0",
+  "description": "CLI launcher for PACKAGE GUI",
+  "bin": {
+    "package-gui": "./bin.ts"
+  },
+  "scripts": {
+    "start": "tsx bin.ts"
+  },
+  "dependencies": {
+    "@stuff-manager/shared": "*"
+  }
+}
