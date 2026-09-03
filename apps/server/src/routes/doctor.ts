@@ -9,7 +9,22 @@ const RunActionSchema = z.object({
   type: z.enum(['launch-app', 'command', 'install-package']),
   application: z.string().optional(),
   command: z.string().optional(),
-  manager: z.enum(['brew', 'npm', 'pip', 'cargo', 'docker', 'android', 'winget', 'chocolatey', 'scoop', 'apt', 'dnf', 'pacman']).optional(),
+  manager: z
+    .enum([
+      'brew',
+      'npm',
+      'pip',
+      'cargo',
+      'docker',
+      'android',
+      'winget',
+      'chocolatey',
+      'scoop',
+      'apt',
+      'dnf',
+      'pacman',
+    ])
+    .optional(),
   packageName: z.string().optional(),
   isPrivileged: z.boolean().optional(),
   requiresTerminal: z.boolean().optional(),
@@ -22,6 +37,7 @@ export const doctorRoutes: FastifyPluginAsync = async (fastify) => {
     const warningCount = checks.filter((c) => c.status === 'warning').length;
     const errorCount = checks.filter((c) => c.status === 'error').length;
     return {
+      ok: true,
       checks,
       summary: {
         total: checks.length,
@@ -35,9 +51,26 @@ export const doctorRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/doctor/run-action', async (req, reply) => {
     const parse = RunActionSchema.safeParse(req.body);
     if (!parse.success) {
-      return reply.code(400).send({ error: parse.error.format() });
+      return reply.code(400).send({
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid doctor action payload',
+          details: parse.error.format(),
+        },
+      });
     }
-    const result = await actionRunner.executeAction(parse.data as any);
-    return result;
+    try {
+      const result = await actionRunner.executeAction(parse.data as any);
+      return { ok: true, ...result };
+    } catch (err: any) {
+      return reply.code(500).send({
+        ok: false,
+        error: {
+          code: 'ACTION_EXECUTION_FAILED',
+          message: err.message || 'Failed to execute doctor recommendation',
+        },
+      });
+    }
   });
 };

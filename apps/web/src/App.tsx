@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from './api/client';
+import { api, AppError } from './api/client';
 import { Sidebar, NavTab } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { OverviewDashboard } from './components/overview/OverviewDashboard';
@@ -10,6 +10,7 @@ import { InstallModal } from './components/packages/InstallModal';
 import { LiveTerminalDrawer } from './components/terminal/LiveTerminalDrawer';
 import { EmbeddedTerminalPanel } from './components/terminal/EmbeddedTerminalPanel';
 import { PrivilegedDialog } from './components/terminal/PrivilegedDialog';
+import { ActionErrorModal } from './components/common/ActionErrorModal';
 import { DoctorView } from './components/doctor/DoctorView';
 import { PortsView } from './components/ports/PortsView';
 import { ProcessView } from './components/processes/ProcessView';
@@ -25,9 +26,20 @@ export function App() {
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isTerminalPanelOpen, setIsTerminalPanelOpen] = useState(false);
+  const [actionError, setActionError] = useState<{ error: AppError | Error; title: string; retryFn?: () => void } | null>(null);
 
   const queryClient = useQueryClient();
-  const { startJob, setPrivilegedDialog } = useTerminal();
+  const { startJob, setPrivilegedDialog, setIsOpen: setIsLogsOpen } = useTerminal();
+
+  // Health check query (determines backend connection status)
+  const { data: healthData, isError: isHealthError } = useQuery({
+    queryKey: ['health'],
+    queryFn: api.checkHealth,
+    refetchInterval: 5000,
+    retry: 3,
+  });
+
+  const isBackendConnected = !isHealthError && (healthData?.ok ?? true);
 
   // Overview query
   const { data: overview, isFetching: isOverviewFetching } = useQuery({
@@ -144,13 +156,21 @@ export function App() {
         jobName: `Update ${pkg.name}`,
         command: `brew upgrade ${pkg.name}`,
         onConfirm: async () => {
-          const res = await api.updatePackage({
-            manager: pkg.manager,
-            name: pkg.name,
-            isCask: pkg.type === 'cask',
-            forceTerminalPrivilege: true,
-          });
-          if (res.job) startJob(res.job);
+          try {
+            const res = await api.updatePackage({
+              manager: pkg.manager,
+              name: pkg.name,
+              isCask: pkg.type === 'cask',
+              forceTerminalPrivilege: true,
+            });
+            if (res.job) startJob(res.job);
+          } catch (err: any) {
+            setActionError({
+              error: err,
+              title: `Failed to update ${pkg.name}`,
+              retryFn: () => handleUpdate(pkg, forceTerminal),
+            });
+          }
         },
         onCancel: () => {},
       });
@@ -165,7 +185,11 @@ export function App() {
       });
       if (res.job) startJob(res.job);
     } catch (err: any) {
-      alert(`Update failed: ${err.message}`);
+      setActionError({
+        error: err,
+        title: `Failed to update ${pkg.name}`,
+        retryFn: () => handleUpdate(pkg, forceTerminal),
+      });
     }
   };
 
@@ -176,13 +200,21 @@ export function App() {
         jobName: `Reinstall ${pkg.name}`,
         command: `brew reinstall ${pkg.name}`,
         onConfirm: async () => {
-          const res = await api.reinstallPackage({
-            manager: pkg.manager,
-            name: pkg.name,
-            isCask: pkg.type === 'cask',
-            forceTerminalPrivilege: true,
-          });
-          if (res.job) startJob(res.job);
+          try {
+            const res = await api.reinstallPackage({
+              manager: pkg.manager,
+              name: pkg.name,
+              isCask: pkg.type === 'cask',
+              forceTerminalPrivilege: true,
+            });
+            if (res.job) startJob(res.job);
+          } catch (err: any) {
+            setActionError({
+              error: err,
+              title: `Failed to reinstall ${pkg.name}`,
+              retryFn: () => handleReinstall(pkg, forceTerminal),
+            });
+          }
         },
         onCancel: () => {},
       });
@@ -197,7 +229,11 @@ export function App() {
       });
       if (res.job) startJob(res.job);
     } catch (err: any) {
-      alert(`Reinstall failed: ${err.message}`);
+      setActionError({
+        error: err,
+        title: `Failed to reinstall ${pkg.name}`,
+        retryFn: () => handleReinstall(pkg, forceTerminal),
+      });
     }
   };
 
@@ -212,15 +248,23 @@ export function App() {
         jobName: `Uninstall ${pkg.name}`,
         command: `brew uninstall ${pkg.name}`,
         onConfirm: async () => {
-          const res = await api.uninstallPackage({
-            manager: pkg.manager,
-            name: pkg.name,
-            isCask: pkg.type === 'cask',
-            forceTerminalPrivilege: true,
-          });
-          if (res.job) {
-            startJob(res.job);
-            setSelectedPackage(null);
+          try {
+            const res = await api.uninstallPackage({
+              manager: pkg.manager,
+              name: pkg.name,
+              isCask: pkg.type === 'cask',
+              forceTerminalPrivilege: true,
+            });
+            if (res.job) {
+              startJob(res.job);
+              setSelectedPackage(null);
+            }
+          } catch (err: any) {
+            setActionError({
+              error: err,
+              title: `Failed to uninstall ${pkg.name}`,
+              retryFn: () => handleUninstall(pkg, forceTerminal),
+            });
           }
         },
         onCancel: () => {},
@@ -239,14 +283,20 @@ export function App() {
         setSelectedPackage(null);
       }
     } catch (err: any) {
-      alert(`Uninstall failed: ${err.message}`);
+      setActionError({
+        error: err,
+        title: `Failed to uninstall ${pkg.name}`,
+        retryFn: () => handleUninstall(pkg, forceTerminal),
+      });
     }
   };
 
   const handleSelectPackageById = async (pkgId: string) => {
-    const pkg = await api.getPackage(pkgId).catch(() => null);
-    if (pkg) {
-      setSelectedPackage(pkg);
+    try {
+      const pkg = await api.getPackage(pkgId);
+      if (pkg) setSelectedPackage(pkg);
+    } catch (err: any) {
+      setActionError({ error: err, title: `Unable to open package ${pkgId}` });
     }
   };
 
@@ -295,7 +345,7 @@ export function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* Header */}
+        {/* Header with backend connection indicator */}
         <Header
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -305,6 +355,7 @@ export function App() {
           isTerminalPanelOpen={isTerminalPanelOpen}
           onToggleTerminalPanel={() => setIsTerminalPanelOpen(!isTerminalPanelOpen)}
           title={getTabTitle()}
+          isBackendConnected={isBackendConnected}
         />
 
         {/* Dynamic View Body */}
@@ -411,6 +462,16 @@ export function App() {
 
       {/* Native Privileged Confirmation Dialog */}
       <PrivilegedDialog />
+
+      {/* Structured Action Error Modal */}
+      <ActionErrorModal
+        error={actionError?.error || null}
+        title={actionError?.title}
+        onClose={() => setActionError(null)}
+        onRetry={actionError?.retryFn}
+        onOpenLogs={() => setIsLogsOpen(true)}
+        onOpenTerminal={() => setIsTerminalPanelOpen(true)}
+      />
     </div>
   );
 }

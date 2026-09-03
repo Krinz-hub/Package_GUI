@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, RefreshCw, Plus, Terminal as TerminalIcon, FileText, Sparkles } from 'lucide-react';
+import { Search, RefreshCw, Plus, Terminal as TerminalIcon, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useTerminal } from '../../context/TerminalContext';
 
 interface HeaderProps {
@@ -12,6 +12,7 @@ interface HeaderProps {
   onToggleTerminalPanel: () => void;
   title: string;
   subtitle?: string;
+  isBackendConnected: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,16 +25,33 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTerminalPanel,
   title,
   subtitle,
+  isBackendConnected,
 }) => {
   const { isOpen: isLogsOpen, setIsOpen: setIsLogsOpen, jobStatus } = useTerminal();
   const isJobRunning = jobStatus === 'running';
 
   return (
     <header className="h-16 border-b border-slate-800/80 bg-[#0c121e]/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-20">
-      {/* Title & context */}
-      <div>
-        <h2 className="text-lg font-bold text-white tracking-tight">{title}</h2>
-        {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+      {/* Title & connection badge */}
+      <div className="flex items-center gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-white tracking-tight">{title}</h2>
+            {/* Live Backend Connection Status Indicator */}
+            {isBackendConnected ? (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Backend Connected
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-red-500/15 text-red-400 border border-red-500/30">
+                <AlertCircle className="w-3 h-3 text-red-400" />
+                Backend Disconnected
+              </span>
+            )}
+          </div>
+          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+        </div>
       </div>
 
       {/* Global Search & Action Controls */}

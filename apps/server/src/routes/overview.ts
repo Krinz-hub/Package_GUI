@@ -18,10 +18,17 @@ export const overviewRoutes: FastifyPluginAsync = async (fastify) => {
     overview.runningProcessesCount = processes.length;
     overview.totalPorts = ports.length;
 
-    return overview;
+    return { ok: true, ...overview };
   });
 
   fastify.get('/health', async () => {
-    return { status: 'ok', timestamp: new Date().toISOString() };
+    return {
+      ok: true,
+      service: 'package-gui',
+      version: '1.0.0',
+      platform: process.platform,
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    };
   });
 };
