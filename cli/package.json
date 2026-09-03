@@ -4,8 +4,9 @@
   "private": true,
   "description": "CLI launcher for PACKAGE GUI",
   "bin": {
-    "pakage": "./bin.ts",
-    "package-gui": "./bin.ts"
+    "package": "./bin.ts",
+    "package-gui": "./bin.ts",
+    "pakage": "./bin.ts"
   },
   "scripts": {
     "start": "tsx bin.ts"

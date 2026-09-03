@@ -21,8 +21,9 @@ const PORT = parseInt(process.env.PORT || '7421', 10);
 const HOST = process.env.HOST || '127.0.0.1'; // Strictly localhost for local-first security
 
 export async function buildServer() {
+  const isDebug = process.env.PACKAGE_DEBUG === '1' || process.env.PAKAGE_DEBUG === '1';
   const fastify = Fastify({
-    logger: process.env.PAKAGE_DEBUG === '1' ? true : false,
+    logger: isDebug ? true : false,
     trustProxy: true,
   });
 
@@ -35,7 +36,7 @@ export async function buildServer() {
       error: {
         code: error.code || (statusCode === 404 ? 'NOT_FOUND' : 'INTERNAL_SERVER_ERROR'),
         message: error.message || 'An internal server error occurred',
-        details: process.env.PAKAGE_DEBUG === '1' ? (error as any).stack : undefined,
+        details: isDebug ? (error as any).stack : undefined,
       },
     });
   });

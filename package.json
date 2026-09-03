@@ -5,8 +5,9 @@
   "type": "module",
   "main": "apps/server/dist/index.js",
   "bin": {
-    "pakage": "./bin/pakage.js",
-    "package-gui": "./bin/pakage.js"
+    "package": "./bin/package.js",
+    "package-gui": "./bin/package.js",
+    "pakage": "./bin/package.js"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -28,13 +29,14 @@
   "scripts": {
     "dev": "concurrently -n \"server,web\" -c \"blue,cyan\" \"npm run dev -w apps/server\" \"npm run dev -w apps/web\"",
     "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
-    "start": "node bin/pakage.js",
-    "gui": "node bin/pakage.js",
-    "package-gui": "node bin/pakage.js",
-    "doctor": "node bin/pakage.js doctor",
-    "status": "node bin/pakage.js status",
-    "logs": "node bin/pakage.js logs",
-    "stop": "node bin/pakage.js stop"
+    "start": "node bin/package.js",
+    "gui": "node bin/package.js",
+    "package": "node bin/package.js",
+    "package-gui": "node bin/package.js",
+    "doctor": "node bin/package.js doctor",
+    "status": "node bin/package.js status",
+    "logs": "node bin/package.js logs",
+    "stop": "node bin/package.js stop"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

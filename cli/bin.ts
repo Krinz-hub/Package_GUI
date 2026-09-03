@@ -1,4 +1,4 @@
 #!/usr/bin/env node
 
-// Forward to bin/pakage.js
-import '../bin/pakage.js';
+// Forward to bin/package.js
+import '../bin/package.js';

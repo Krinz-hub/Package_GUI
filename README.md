@@ -11,7 +11,7 @@ npm install -g package-gui
 ## Run
 
 ```bash
-pakage
+package
 ```
 
 That's it.
@@ -21,9 +21,11 @@ PACKAGE GUI will start locally and open the dashboard in your browser.
 Also supported:
 
 ```bash
-pakage gui
+package gui
 # or
 package-gui
+# or
+pakage
 ```
 
 Expected terminal output:
@@ -56,7 +58,7 @@ Ctrl+C
 or:
 
 ```bash
-pakage stop
+package stop
 ```
 
 ---
@@ -64,7 +66,7 @@ pakage stop
 ## Diagnostics
 
 ```bash
-pakage doctor
+package doctor
 ```
 
 Inspects your development environment:
@@ -83,7 +85,7 @@ Inspects your development environment:
 ## Status
 
 ```bash
-pakage status
+package status
 ```
 
 Displays active server status, dashboard URL, PID, port, operating system, detected package managers, package counts, listening ports, and monitored processes.
@@ -93,15 +95,17 @@ Displays active server status, dashboard URL, PID, port, operating system, detec
 ## Help
 
 ```bash
-pakage --help
+package --help
 ```
 
 ### CLI Options
 
 ```text
 USAGE:
+  package [command] [options]
+  package gui [options]
+  package-gui [command] [options]
   pakage [command] [options]
-  pakage gui [options]
 
 COMMANDS:
   gui            Launch the PACKAGE GUI server and open dashboard (default)
@@ -126,13 +130,13 @@ OPTIONS:
 
 ```bash
 # View recent logs
-pakage logs
+package logs
 
 # Follow live output stream
-pakage logs -f
+package logs -f
 
 # View specific number of lines
-pakage logs -n 100
+package logs -n 100
 ```
 
 ---
@@ -140,7 +144,7 @@ pakage logs -n 100
 ## Updates
 
 ```bash
-pakage update
+package update
 ```
 
 Checks the npm registry for newer versions of `package-gui`.
@@ -184,7 +188,7 @@ npm run dev
 npm run build
 
 # Run local CLI
-node bin/pakage.js
+node bin/package.js
 ```
 
 ---
