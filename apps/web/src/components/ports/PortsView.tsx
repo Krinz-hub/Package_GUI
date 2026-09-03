@@ -17,6 +17,7 @@ interface PortsViewProps {
   isLoading: boolean;
   onRefresh: () => void;
   onSelectPackageId?: (pkgId: string) => void;
+  onError?: (err: Error, title: string, retryFn?: () => void) => void;
 }
 
 export const PortsView: React.FC<PortsViewProps> = ({
@@ -24,6 +25,7 @@ export const PortsView: React.FC<PortsViewProps> = ({
   isLoading,
   onRefresh,
   onSelectPackageId,
+  onError,
 }) => {
   const [filter, setFilter] = useState('');
   const [stoppingPid, setStoppingPid] = useState<number | null>(null);
@@ -56,10 +58,19 @@ export const PortsView: React.FC<PortsViewProps> = ({
       if (res.success) {
         onRefresh();
       } else {
-        alert(res.message);
+        const errMsg = res.message || `Failed to stop process ${port.pid}`;
+        if (onError) {
+          onError(new Error(errMsg), `Failed to stop ${port.processName} (PID ${port.pid})`, () => handleStop(port));
+        } else {
+          alert(errMsg);
+        }
       }
     } catch (err: any) {
-      alert(`Failed to stop process: ${err.message}`);
+      if (onError) {
+        onError(err, `Failed to stop ${port.processName} (PID ${port.pid})`, () => handleStop(port));
+      } else {
+        alert(`Failed to stop process: ${err.message}`);
+      }
     } finally {
       setStoppingPid(null);
     }

@@ -26,15 +26,20 @@ export const ActionErrorModal: React.FC<ActionErrorModalProps> = ({
   const getBadge = () => {
     switch (appErr.code) {
       case 'BACKEND_UNAVAILABLE':
-        return <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-xs">BACKEND_UNAVAILABLE</span>;
+      case 'NETWORK_ERROR':
+        return <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-xs border border-red-500/30">BACKEND_UNAVAILABLE</span>;
       case 'PERMISSION_ERROR':
-        return <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-xs">PERMISSION_REQUIRED</span>;
+        return <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-xs border border-amber-500/30">PERMISSION_REQUIRED</span>;
       case 'PACKAGE_MANAGER_ERROR':
-        return <span className="px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 font-mono text-xs">PACKAGE_MANAGER_ERROR</span>;
+        return <span className="px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 font-mono text-xs border border-orange-500/30">PACKAGE_MANAGER_ERROR</span>;
       case 'VALIDATION_ERROR':
-        return <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono text-xs">VALIDATION_ERROR</span>;
+        return <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono text-xs border border-purple-500/30">VALIDATION_ERROR</span>;
+      case 'TIMEOUT':
+        return <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-mono text-xs border border-yellow-500/30">OPERATION_TIMEOUT</span>;
+      case 'PROCESS_ERROR':
+        return <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono text-xs border border-rose-500/30">PROCESS_ERROR</span>;
       default:
-        return <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-xs">{appErr.code}</span>;
+        return <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-xs border border-slate-700">{appErr.code}</span>;
     }
   };
 

@@ -27,6 +27,8 @@ export const overviewRoutes: FastifyPluginAsync = async (fastify) => {
       service: 'package-gui',
       version: '1.0.0',
       platform: process.platform,
+      arch: process.arch,
+      nodeVersion: process.version,
       uptime: Math.floor(process.uptime()),
       timestamp: new Date().toISOString(),
     };

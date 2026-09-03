@@ -7,7 +7,6 @@ import {
   Shield,
   Boxes,
   RotateCw,
-  CheckCircle2,
 } from 'lucide-react';
 import { PackageManagerType, Package } from '@stuff-manager/shared';
 import { api } from '../../api/client';
@@ -26,6 +25,7 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
   const [searchResults, setSearchResults] = useState<Package[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [installError, setInstallError] = useState<string | null>(null);
   const { startJob } = useTerminal();
 
   if (!isOpen) return null;
@@ -33,11 +33,13 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
   const handleSearch = async () => {
     if (!packageName.trim()) return;
     setIsSearching(true);
+    setInstallError(null);
     try {
       const res = await api.searchPackages(packageName.trim(), manager);
       setSearchResults(res.results || []);
-    } catch (_) {
+    } catch (err: any) {
       setSearchResults([]);
+      setInstallError(err.message || 'Failed to search package repository.');
     } finally {
       setIsSearching(false);
     }
@@ -48,6 +50,7 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
     if (!targetName) return;
 
     setIsInstalling(true);
+    setInstallError(null);
     try {
       const res = await api.installPackage({
         manager,
@@ -61,7 +64,7 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
         onClose();
       }
     } catch (err: any) {
-      alert(`Installation failed to start: ${err.message}`);
+      setInstallError(err.message || 'Package installation failed to start.');
     } finally {
       setIsInstalling(false);
     }
@@ -222,6 +225,16 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Error message banner */}
+          {installError && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-300 font-mono space-y-1">
+              <div className="font-semibold flex items-center gap-1.5 text-red-400 font-sans">
+                <span>Operation Error</span>
+              </div>
+              <p className="leading-relaxed whitespace-pre-wrap">{installError}</p>
             </div>
           )}
         </div>

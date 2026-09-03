@@ -19,6 +19,7 @@ interface ProcessViewProps {
   services: ServiceInfo[];
   isLoading: boolean;
   onRefresh: () => void;
+  onError?: (err: Error, title: string, retryFn?: () => void) => void;
 }
 
 export const ProcessView: React.FC<ProcessViewProps> = ({
@@ -26,6 +27,7 @@ export const ProcessView: React.FC<ProcessViewProps> = ({
   services,
   isLoading,
   onRefresh,
+  onError,
 }) => {
   const [stoppingPid, setStoppingPid] = useState<number | null>(null);
 
@@ -40,10 +42,19 @@ export const ProcessView: React.FC<ProcessViewProps> = ({
       if (res.success) {
         onRefresh();
       } else {
-        alert(res.message);
+        const errMsg = res.message || `Failed to stop process ${proc.pid}`;
+        if (onError) {
+          onError(new Error(errMsg), `Failed to stop ${proc.name} (PID ${proc.pid})`, () => handleStopProcess(proc));
+        } else {
+          alert(errMsg);
+        }
       }
     } catch (err: any) {
-      alert(`Failed to stop process: ${err.message}`);
+      if (onError) {
+        onError(err, `Failed to stop ${proc.name} (PID ${proc.pid})`, () => handleStopProcess(proc));
+      } else {
+        alert(`Failed to stop process: ${err.message}`);
+      }
     } finally {
       setStoppingPid(null);
     }

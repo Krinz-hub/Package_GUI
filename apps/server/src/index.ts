@@ -40,24 +40,31 @@ export async function buildServer() {
     });
   });
 
-  // Security: CORS dynamically allows all local loopback origins (localhost / 127.0.0.1 on any port)
+  // Security: CORS dynamically allows all local loopback origins (localhost / 127.0.0.1 / [::1] on any port)
   await fastify.register(cors, {
     origin: (origin, cb) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, same-origin, electron)
       if (!origin) return cb(null, true);
       try {
         const url = new URL(origin);
+        const host = url.hostname;
         if (
-          url.hostname === 'localhost' ||
-          url.hostname === '127.0.0.1' ||
-          url.hostname === '0.0.0.0'
+          host === 'localhost' ||
+          host === '127.0.0.1' ||
+          host === '0.0.0.0' ||
+          host === '::1' ||
+          host === '[::1]'
         ) {
           return cb(null, true);
         }
       } catch (_) {}
-      cb(new Error('Origin not allowed by local CORS policy'), false);
+      // Return false gracefully instead of throwing an unhandled Error that terminates preflights
+      cb(null, false);
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'Range'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
   });
 
   // WebSocket support

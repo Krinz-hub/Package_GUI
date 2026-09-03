@@ -391,6 +391,7 @@ export function App() {
               isLoading={isPortsLoading}
               onRefresh={() => refetchPorts()}
               onSelectPackageId={handleSelectPackageById}
+              onError={(err, title, retryFn) => setActionError({ error: err, title, retryFn })}
             />
           )}
 
@@ -399,6 +400,7 @@ export function App() {
               checks={doctorData?.checks || []}
               isLoading={isDoctorLoading}
               onRefresh={() => refetchDoctor()}
+              onError={(err, title, retryFn) => setActionError({ error: err, title, retryFn })}
             />
           )}
 
@@ -411,6 +413,7 @@ export function App() {
                 refetchProcesses();
                 refetchServices();
               }}
+              onError={(err, title, retryFn) => setActionError({ error: err, title, retryFn })}
             />
           )}
 

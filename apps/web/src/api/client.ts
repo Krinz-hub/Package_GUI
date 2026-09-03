@@ -28,80 +28,139 @@ export class AppError extends Error {
   public status?: number;
   public details?: any;
   public backendUrl: string;
+  public timestamp: string;
 
-  constructor(message: string, code: ErrorCategory = 'UNKNOWN_ERROR', status?: number, details?: any) {
+  constructor(
+    message: string,
+    code: ErrorCategory = 'UNKNOWN_ERROR',
+    status?: number,
+    details?: any
+  ) {
     super(message);
     this.name = 'AppError';
     this.code = code;
     this.status = status;
     this.details = details;
     this.backendUrl = window.location.origin;
+    this.timestamp = new Date().toISOString();
   }
 }
 
-const API_BASE = '/api';
+// API base resolution: Use Vite env override if provided, otherwise relative /api
+const getApiBaseUrl = (): string => {
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
+    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+  }
+  return '/api';
+};
 
-async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const fullUrl = `${API_BASE}${url}`;
+const API_BASE = getApiBaseUrl();
+
+interface FetchOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
+async function fetchJson<T>(url: string, options?: FetchOptions): Promise<T> {
+  const fullUrl = `${API_BASE}${url.startsWith('/') ? url : `/${url}`}`;
+  const timeoutMs = options?.timeoutMs ?? 30000; // 30s timeout
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   let res: Response;
   try {
     res = await fetch(fullUrl, {
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
         ...options?.headers,
       },
       ...options,
     });
   } catch (networkErr: any) {
-    // Catch browser network errors (e.g. ECONNREFUSED, proxy failure, server down)
-    const errorMsg = `Unable to connect to PACKAGE GUI backend at ${window.location.origin}. Server may be offline or starting up.`;
-    throw new AppError(errorMsg, 'BACKEND_UNAVAILABLE', 0, networkErr.message);
+    clearTimeout(timeoutId);
+    if (networkErr.name === 'AbortError') {
+      throw new AppError(
+        `Request to ${url} timed out after ${timeoutMs / 1000}s. The backend may be processing a heavy system task or is unresponsive.`,
+        'TIMEOUT',
+        408
+      );
+    }
+    // Catch browser network errors (e.g. ECONNREFUSED, proxy failure, server down, CORS preflight fail)
+    const errorMsg = `Unable to connect to PACKAGE GUI backend (${window.location.origin}). The local server may be starting up, offline, or blocked by local security policy.`;
+    throw new AppError(errorMsg, 'BACKEND_UNAVAILABLE', 0, networkErr.message || String(networkErr));
+  } finally {
+    clearTimeout(timeoutId);
   }
 
-  // If HTTP status is error
+  // Handle non-2xx HTTP responses
   if (!res.ok) {
     let errorData: any = null;
-    let message = `Request to ${url} failed with status ${res.status} (${res.statusText})`;
+    let message = `Server responded with status ${res.status} (${res.statusText}) for ${url}`;
     let code: ErrorCategory = 'API_ERROR';
 
     try {
       errorData = await res.json();
-      if (errorData.error) {
+      if (errorData) {
         if (typeof errorData.error === 'string') {
           message = errorData.error;
-        } else if (errorData.error.message) {
-          message = errorData.error.message;
+        } else if (errorData.error && typeof errorData.error === 'object') {
+          message = errorData.error.message || message;
           if (errorData.error.code) {
-            code = errorData.error.code as ErrorCategory;
+            const rawCode = String(errorData.error.code);
+            if (rawCode.includes('PERMISSION') || rawCode.includes('SUDO')) {
+              code = 'PERMISSION_ERROR';
+            } else if (rawCode.includes('PACKAGE') || rawCode.includes('INSTALL') || rawCode.includes('UNINSTALL')) {
+              code = 'PACKAGE_MANAGER_ERROR';
+            } else if (rawCode.includes('VALIDATION')) {
+              code = 'VALIDATION_ERROR';
+            } else if (rawCode.includes('PROCESS')) {
+              code = 'PROCESS_ERROR';
+            } else if (rawCode.includes('BACKEND')) {
+              code = 'BACKEND_UNAVAILABLE';
+            } else {
+              code = (rawCode as ErrorCategory) || 'API_ERROR';
+            }
           }
+        } else if (errorData.message) {
+          message = errorData.message;
         }
       }
     } catch (_) {
-      // Non-JSON error body
       try {
         const text = await res.text();
-        if (text) message = text.slice(0, 200);
+        if (text && text.trim()) message = text.trim().slice(0, 300);
       } catch (_) {}
     }
 
-    if (res.status === 403 || res.status === 401) {
+    // Status code fallbacks
+    if (res.status === 401 || res.status === 403) {
       code = 'PERMISSION_ERROR';
     } else if (res.status === 400) {
       code = code === 'API_ERROR' ? 'VALIDATION_ERROR' : code;
     } else if (res.status === 404) {
       code = 'API_ERROR';
-    } else if (res.status >= 500) {
-      code = code === 'API_ERROR' ? 'PACKAGE_MANAGER_ERROR' : code;
+    } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+      code = 'BACKEND_UNAVAILABLE';
+    } else if (res.status >= 500 && code === 'API_ERROR') {
+      code = 'PACKAGE_MANAGER_ERROR';
     }
 
     throw new AppError(message, code, res.status, errorData);
   }
 
+  // Parse JSON response body
   try {
     return (await res.json()) as T;
   } catch (jsonErr: any) {
-    throw new AppError(`Malformed response from server for ${url}`, 'API_ERROR', res.status, jsonErr.message);
+    throw new AppError(
+      `Malformed JSON response from server for ${url}`,
+      'API_ERROR',
+      res.status,
+      jsonErr.message
+    );
   }
 }
 
@@ -110,12 +169,14 @@ export interface HealthCheckResult {
   service: string;
   version: string;
   platform: string;
+  arch?: string;
+  nodeVersion?: string;
   uptime: number;
   timestamp: string;
 }
 
 export const api = {
-  checkHealth: () => fetchJson<HealthCheckResult>('/health'),
+  checkHealth: () => fetchJson<HealthCheckResult>('/health', { timeoutMs: 5000 }),
 
   getOverview: () => fetchJson<SystemOverview>('/overview'),
 

@@ -21,9 +21,10 @@ interface DoctorViewProps {
   checks: DoctorCheck[];
   isLoading: boolean;
   onRefresh: () => void;
+  onError?: (err: Error, title: string, retryFn?: () => void) => void;
 }
 
-export const DoctorView: React.FC<DoctorViewProps> = ({ checks, isLoading, onRefresh }) => {
+export const DoctorView: React.FC<DoctorViewProps> = ({ checks, isLoading, onRefresh, onError }) => {
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ id: string; message: string; isError?: boolean } | null>(null);
@@ -50,6 +51,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({ checks, isLoading, onRef
             setTimeout(() => onRefresh(), 2000);
           } catch (err: any) {
             setActionFeedback({ id: action.id, message: err.message, isError: true });
+            if (onError) onError(err, `Failed to execute: ${action.label}`, () => handleRunAction(action));
           } finally {
             setRunningActionId(null);
           }
@@ -70,6 +72,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({ checks, isLoading, onRef
       setTimeout(() => onRefresh(), 3000);
     } catch (err: any) {
       setActionFeedback({ id: action.id, message: err.message, isError: true });
+      if (onError) onError(err, `Failed to execute: ${action.label}`, () => handleRunAction(action));
     } finally {
       setRunningActionId(null);
     }
