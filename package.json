@@ -6,7 +6,6 @@
   "main": "apps/server/dist/index.js",
   "bin": {
     "pakage": "./bin/pakage.js",
-    "package": "./bin/package.js",
     "package-gui": "./bin/package.js"
   },
   "repository": {
