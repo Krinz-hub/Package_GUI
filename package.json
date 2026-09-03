@@ -1,23 +1,50 @@
 {
-  "name": "stuff-manager",
+  "name": "package-gui",
   "version": "1.0.0",
-  "private": true,
   "description": "PACKAGE GUI — Local-first Developer Package Management Dashboard for macOS, Windows & Linux",
+  "type": "module",
+  "main": "apps/server/dist/index.js",
   "bin": {
-    "pakage": "./cli/bin.ts",
-    "package-gui": "./cli/bin.ts"
+    "pakage": "./bin/pakage.js",
+    "package-gui": "./bin/pakage.js"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin",
+    "apps/server/dist",
+    "apps/server/package.json",
+    "apps/web/dist",
+    "packages/shared/dist",
+    "packages/shared/package.json",
+    "README.md",
+    "package.json"
+  ],
   "workspaces": [
     "packages/*",
-    "apps/*",
-    "cli"
+    "apps/*"
   ],
   "scripts": {
     "dev": "concurrently -n \"server,web\" -c \"blue,cyan\" \"npm run dev -w apps/server\" \"npm run dev -w apps/web\"",
     "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
-    "start": "node apps/server/dist/index.js",
-    "gui": "tsx cli/bin.ts",
-    "start:gui": "tsx cli/bin.ts"
+    "start": "node bin/pakage.js",
+    "gui": "node bin/pakage.js",
+    "doctor": "node bin/pakage.js doctor",
+    "status": "node bin/pakage.js status",
+    "logs": "node bin/pakage.js logs",
+    "stop": "node bin/pakage.js stop"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.2",
+    "@fastify/static": "^10.1.3",
+    "@fastify/websocket": "^11.0.2",
+    "fastify": "^5.2.1",
+    "ws": "^8.18.0",
+    "zod": "^3.24.2"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.1.0"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

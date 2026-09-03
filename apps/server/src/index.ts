@@ -17,7 +17,7 @@ import { websocketRoutes } from './routes/ws.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = parseInt(process.env.PORT || '4173', 10);
+const PORT = parseInt(process.env.PORT || '7421', 10);
 const HOST = process.env.HOST || '127.0.0.1'; // Strictly localhost for local-first security
 
 export async function buildServer() {
@@ -85,7 +85,9 @@ export async function buildServer() {
   // Same-origin static bundle serving in production
   const potentialDistPaths = [
     path.resolve(__dirname, '../../web/dist'),
+    path.resolve(__dirname, '../../../apps/web/dist'),
     path.resolve(__dirname, '../web/dist'),
+    path.resolve(__dirname, '../../apps/web/dist'),
     path.resolve(process.cwd(), 'apps/web/dist'),
     path.resolve(process.cwd(), 'dist'),
   ];

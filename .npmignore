@@ -1,0 +1,32 @@
+# Source and development files
+apps/server/src/
+apps/web/src/
+packages/shared/src/
+cli/
+
+# Dependencies and caches
+node_modules/
+.venv/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# Secrets and environment files
+.env
+.env.*
+*.pem
+*.key
+
+# Git and IDE
+.git/
+.github/
+.vscode/
+.idea/
+.DS_Store
+
+# Logs and test artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tgz
